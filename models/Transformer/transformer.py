@@ -47,7 +47,7 @@ class MultiheadAttention(nn.Module):
 
 class Transformer(nn.Module):
     def __init__(
-        self, *, dim, depth, heads=4, head_dim=None, ff_dim, max_seq_len=128, ff_dropout=0.0
+        self, *, dim, heads=4, depth, head_dim=None, ff_dim, ff_dropout=0.0, max_seq_len=128
     ):
         super(Transformer, self).__init__()
         self.layers = nn.ModuleList([])
@@ -63,7 +63,7 @@ class Transformer(nn.Module):
                         Residual(
                             Norm(
                                 MultiheadAttention(
-                                    embedding_dim=dim, heads=heads
+                                    embedding_dim=dim, heads=heads, head_dim=head_dim
                                 ),
                                 dim=(dim),
                             ),
