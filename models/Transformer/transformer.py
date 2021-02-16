@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch import nn, einsum
 from einops import rearrange, repeat
 
-from utils.helpers import Residual, Norm, FeedForward
+from models.utils.base_block import Residual, Norm, FeedForward
 
 
 class MultiheadAttention(nn.Module):

@@ -25,28 +25,36 @@ class Norm(nn.Module):
         return self._norm(x)
 
 class FeedForward(nn.Module):
-    def __init__(self, *, dim=None, hidden_dim=None, residual=False, dropout=0.0):
+    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, dropout=0.0, useResidualWithNorm=False):
         super().__init__()
-        assert dim is not None, "[FeedForward] Must specify the in/out dim"
+        assert dim is not None, "[FeedForward] Must specify the input dim"
         assert hidden_dim is not None, "[FeedForward] Must specify the hidden dim"
 
-        if residual:
+        out_dim = output_dim if output_dim is not None else dim
+
+        if useResidualWithNorm:
             self._net = nn.Sequential(
                 Residual(
-                    nn.Sequential(
-                        nn.Linear(dim, hidden_dim),
-                        nn.GELU(),
-                        nn.Dropout(dropout),
+                    Norm(
+                        nn.Sequential(
+                            nn.Linear(dim, hidden_dim),
+                            nn.GELU(),
+                            nn.Dropout(dropout),
+                        ),
+                        dim=dim
                     )
                 ),
-                nn.Linear(hidden_dim, dim),
+                Norm(
+                    nn.Linear(hidden_dim, out_dim),
+                    dim=hidden_dim
+                ),
             )
         else:
             self._net = nn.Sequential(
                 nn.Linear(dim, hidden_dim),
                 nn.GELU(),
                 nn.Dropout(dropout),
-                nn.Linear(hidden_dim, dim),
+                nn.Linear(hidden_dim, out_dim),
             )
 
     def forward(self, x):

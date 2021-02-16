@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from einops import rearrange
 
-from Transformer.transformer import Transformer
-from utils.helpers import Residual, Norm, FeedForward
+from models.Transformer.transformer import Transformer
+from models.utils.base_block import Residual, Norm, FeedForward
 
 
 class ViT(nn.Module):
@@ -56,17 +56,12 @@ class ViT(nn.Module):
             )
         )
 
-        self.proj_head = nn.Sequential(
-            Residual(
-                Norm(
-                    nn.Sequential(
-                        nn.Linear(dim, dim),
-                        nn.GELU(),
-                    ),
-                    dim=dim
-                )
-            ),
-            nn.Linear(dim, num_classes)
+        self.proj_head = FeedForward(
+            dim=dim,
+            hidden_dim=dim,
+            output_dim=num_classes,
+            dropout=proj_head_dropout,
+            useResidualWithNorm=True,
         )
 
     def forward(self, x, att_mask=None, padding_mask=None):
