@@ -83,9 +83,8 @@ class ViT(nn.Module):
 
         # Projection head
         cls_output = x[:, 0, :]
-        x = self.proj_head(x)
-
-        return x
+        
+        return self.proj_head(cls_output)
 
 
 if __name__ == "__main__":

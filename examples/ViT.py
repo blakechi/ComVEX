@@ -38,4 +38,5 @@ if __name__ == "__main__":
 
 
     for epoch in range(EPOCH):
-        for batch_id, (data, y) in train_loader:
+        for batch_id, (data, y) in enumerate(train_loader):
+            ...
