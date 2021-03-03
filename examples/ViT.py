@@ -39,4 +39,5 @@ if __name__ == "__main__":
 
     for epoch in range(EPOCH):
         for batch_id, (data, y) in enumerate(train_loader):
-            ...
+            print(data.shape)
+            print(y.shape)

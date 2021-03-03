@@ -9,10 +9,10 @@ from models.utils.base_block import Residual, Norm, FeedForward
 class ViT(nn.Module):
     def __init__(
         self,
-        img_size,  # one lateral's size of a squre image
+        img_size,    # one lateral's size of a squre image
         patch_size,  # one lateral's size of a squre patch
         num_classes,
-        dim,  # tokens' dimension
+        dim,         # tokens' dimension
         num_heads,
         num_layers,
         feedforward_dim,
@@ -72,9 +72,11 @@ class ViT(nn.Module):
 
         # Linear projection
         x = self.linear_proj_patches(x)
+
         # Prepend CLS token and add position code
         CLS = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
         x = torch.cat([CLS, x], dim=1) + self.position_code
+        
         # Token dropout
         x = self.token_dropout(x)
         
@@ -88,6 +90,7 @@ class ViT(nn.Module):
 
 
 if __name__ == "__main__":
+    
     vit = ViT(
         img_size=1024,
         patch_size=32,
