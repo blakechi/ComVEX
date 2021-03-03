@@ -56,30 +56,30 @@ class Transformer(nn.Module):
         self.heads = heads
         self.max_seq_len = max_seq_len
 
-        for _ in range(depth):
-            self.layers.append(
-                nn.ModuleList(
-                    [
-                        Residual(
-                            Norm(
-                                MultiheadAttention(
-                                    embedding_dim=dim, heads=heads, head_dim=head_dim
-                                ),
-                                dim=(dim),
+        self.layers = nn.ModuleList([
+            nn.ModuleList(
+                [
+                    Residual(
+                        Norm(
+                            MultiheadAttention(
+                                embedding_dim=dim, heads=heads, head_dim=head_dim
                             ),
+                            dim=dim,
                         ),
-                        Residual(
-                            Norm(
-                                FeedForward(
-                                    dim=dim, hidden_dim=ff_dim, dropout=ff_dropout
-                                ),
-                                dim=(dim),
+                    ),
+                    Residual(
+                        Norm(
+                            FeedForward(
+                                dim=dim, hidden_dim=ff_dim, dropout=ff_dropout
                             ),
+                            dim=dim,
                         ),
-                    ]
-                )
+                    ),
+                ]
             )
-
+            for _ in range(depth)
+        ])
+                
     def forward(self, x, att_mask=None, padding_mask=None):
         # device = x.device
 
