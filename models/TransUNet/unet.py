@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 import torch
 from torch import nn
 from torchvision import transforms
@@ -73,9 +75,9 @@ class Decoder(nn.Module):
         return transforms.functional.center_crop(hidden_x, [h, w])
 
 
-class UNet(nn.Module):
+class UNetArchitecture(nn.Module):
     def __init__(self, *, input_channel=1, middle_channel=1024, output_channel=1, channel_in_between=[], to_remain_size=False, image_size=None):
-        super(UNet, self).__init__()
+        super(UNetArchitecture, self).__init__()
 
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
 
@@ -84,7 +86,7 @@ class UNet(nn.Module):
             self.image_size = image_size
 
         self.encoder = Encoder(input_channel, channel_in_between)
-        self.middle_layer = ConvBlock(channel_in_between[-1], middle_channel)
+        self.middle_layer = self._build_middle_layer(channel_in_between[-1], middle_channel)
         self.decoder = Decoder(middle_channel, channel_in_between[::-1])
         self.output_layer = nn.Conv2d(channel_in_between[0], output_channel, kernel_size=1)
 
@@ -103,6 +105,15 @@ class UNet(nn.Module):
             )
             
         return x
+        
+    @abstractmethod
+    def _build_middle_layer(self, in_channel, out_channel):
+        ...
+
+
+class UNet(UNetArchitecture):
+    def _build_middle_layer(self, in_channel, out_channel):
+        return ConvBlock(in_channel, out_channel)
 
 
 if __name__ == "__main__":
