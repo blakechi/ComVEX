@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from models.Transformer.transformer import Transformer
-from models.TransUNet.unet import UNetArchitecture
+from models.utils.unet import UNetArchitecture
 
 
 class TransUNet(UNetArchitecture):
