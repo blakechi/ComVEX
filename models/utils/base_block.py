@@ -24,6 +24,7 @@ class Norm(nn.Module):
 
         return self._norm(x)
 
+
 class FeedForward(nn.Module):
     def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, dropout=0.0, useResidualWithNorm=False):
         super().__init__()

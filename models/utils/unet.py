@@ -5,9 +5,9 @@ from torch import nn
 from torchvision import transforms
 
 
-class ConvBlock(nn.Module):
+class UNetConvBlock(nn.Module):
     def __init__(self, in_channel, out_channel):
-        super(ConvBlock, self).__init__()
+        super(UNetConvBlock, self).__init__()
 
         self.net = nn.Sequential(
             nn.Conv2d(in_channel, out_channel, 3),
@@ -20,16 +20,16 @@ class ConvBlock(nn.Module):
         return self.net(x)
 
 
-class Encoder(nn.Module):
+class UNetEncoder(nn.Module):
     def __init__(self, input_channel=1, channel_in_between=[]):
-        super(Encoder, self).__init__()
+        super(UNetEncoder, self).__init__()
         
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
 
         channel_in_between = [input_channel] + channel_in_between
         self.layers = nn.ModuleList([
             nn.ModuleList([
-                ConvBlock(channel_in_between[idx], channel_in_between[idx + 1]),
+                UNetConvBlock(channel_in_between[idx], channel_in_between[idx + 1]),
                 nn.MaxPool2d(kernel_size=2)
             ]) 
             for idx in range(len(channel_in_between) - 1)
@@ -45,16 +45,16 @@ class Encoder(nn.Module):
         return x, hidden_xs
 
 
-class Decoder(nn.Module):
+class UNetDecoder(nn.Module):
     def __init__(self, middle_channel=1024, channel_in_between=[]):
-        super(Decoder, self).__init__()
+        super(UNetDecoder, self).__init__()
 
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
 
         channel_in_between = [middle_channel] + channel_in_between
         self.layers = nn.ModuleList([
             nn.ModuleList([
-                ConvBlock(channel_in_between[idx], channel_in_between[idx + 1]),
+                UNetConvBlock(channel_in_between[idx], channel_in_between[idx + 1]),
                 nn.ConvTranspose2d(channel_in_between[idx], channel_in_between[idx + 1], kernel_size=2, stride=2)
             ]) 
             for idx in range(len(channel_in_between) - 1)
@@ -75,9 +75,9 @@ class Decoder(nn.Module):
         return transforms.functional.center_crop(hidden_x, [h, w])
 
 
-class UNetArchitecture(nn.Module):
+class UNetBase(nn.Module):
     def __init__(self, *, input_channel=1, middle_channel=1024, output_channel=1, channel_in_between=[], to_remain_size=False, image_size=None):
-        super(UNetArchitecture, self).__init__()
+        super(UNetBase, self).__init__()
 
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
 
@@ -85,9 +85,9 @@ class UNetArchitecture(nn.Module):
         if to_remain_size:
             self.image_size = image_size
 
-        self.encoder = Encoder(input_channel, channel_in_between)
+        self.encoder = UNetEncoder(input_channel, channel_in_between)
         self.middle_layer = self._build_middle_layer(channel_in_between[-1], middle_channel)
-        self.decoder = Decoder(middle_channel, channel_in_between[::-1])
+        self.decoder = UNetDecoder(middle_channel, channel_in_between[::-1])
         self.output_layer = nn.Conv2d(channel_in_between[0], output_channel, kernel_size=1)
 
     def forward(self, x):
@@ -111,9 +111,9 @@ class UNetArchitecture(nn.Module):
         ...
 
 
-class UNet(UNetArchitecture):
+class UNet(UNetBase):
     def _build_middle_layer(self, in_channel, out_channel):
-        return ConvBlock(in_channel, out_channel)
+        return UNetConvBlock(in_channel, out_channel)
 
 
 if __name__ == "__main__":

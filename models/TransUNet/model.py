@@ -1,11 +1,11 @@
 import torch
 from torch import nn
 
-from models.Transformer.transformer import Transformer
-from models.utils.unet import UNetArchitecture
+from models.transformer import Transformer
+from models.utils import UNetBase
 
 
-class TransUNet(UNetArchitecture):
+class TransUNet(UNetBase):
     def _build_middle_layer(self, in_channel, out_channel):
         ...
 

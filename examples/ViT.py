@@ -5,11 +5,13 @@ sys.path.insert(0, os.getcwd())
 import torch
 from torchvision import transforms, datasets
 
-from models.ViT.vision_transformer import ViT
+from models.vit import ViT
+
 
 EPOCH = 10
 BATCH_SIZE = 32
 LR_RATE = 1e-4
+
 
 if __name__ == "__main__":
 

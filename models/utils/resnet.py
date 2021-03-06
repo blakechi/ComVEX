@@ -63,7 +63,7 @@ class ResNetBlock(ResNetBlockBase):
         return self.relu(self.layers(x) + x)
 
 
-class ResNetBottleneckBlock(ResNetBlock):
+class ResNetBottleneck(ResNetBlock):
     def __init__(self, in_channel, out_channel, **kwargs):
         super().__init__(in_channel, out_channel, **kwargs)
 
@@ -98,7 +98,7 @@ class ResNetBottleneckBlock(ResNetBlock):
         self.relu = nn.ReLU(inplace=True)  # after addition
 
 
-class FullPreActivationResNet(ResNetBlockBase):
+class ResNetFullPreActivation(ResNetBlockBase):
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__(in_channels, out_channels, **kwargs)
 
@@ -130,7 +130,7 @@ class FullPreActivationResNet(ResNetBlockBase):
         return self.layers(x) + x
 
 
-class FullPreActivationResNetBottleneck(FullPreActivationResNet):
+class ResNetFullPreActivationBottleneck(ResNetFullPreActivation):
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__(in_channels, out_channels, **kwargs)
 
@@ -166,7 +166,7 @@ class FullPreActivationResNetBottleneck(FullPreActivationResNet):
 
 
 if __name__ == "__main__":
-    b = FullPreActivationResNetBottleneck(10, 10)
+    b = ResNetFullPreActivationBottleneck(10, 10)
 
     a = torch.rand(1, 10, 32, 32)
 

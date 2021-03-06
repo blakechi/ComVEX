@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from einops import rearrange
 
-from models.Transformer.transformer import Transformer
-from models.utils.base_block import Residual, Norm, FeedForward
+from models.transformer import Transformer
+from models.utils import Residual, Norm, FeedForward
 
 
 class ViT(nn.Module):
