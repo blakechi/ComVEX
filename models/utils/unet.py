@@ -7,7 +7,7 @@ from torchvision import transforms
 
 class UNetConvBlock(nn.Module):
     def __init__(self, in_channel, out_channel):
-        super(UNetConvBlock, self).__init__()
+        super().__init__()
 
         self.net = nn.Sequential(
             nn.Conv2d(in_channel, out_channel, 3),
@@ -22,7 +22,7 @@ class UNetConvBlock(nn.Module):
 
 class UNetEncoder(nn.Module):
     def __init__(self, input_channel=1, channel_in_between=[]):
-        super(UNetEncoder, self).__init__()
+        super().__init__()
         
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
 
@@ -47,7 +47,7 @@ class UNetEncoder(nn.Module):
 
 class UNetDecoder(nn.Module):
     def __init__(self, middle_channel=1024, channel_in_between=[]):
-        super(UNetDecoder, self).__init__()
+        super().__init__()
 
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
 
@@ -76,19 +76,38 @@ class UNetDecoder(nn.Module):
 
 
 class UNetBase(nn.Module):
-    def __init__(self, *, input_channel=1, middle_channel=1024, output_channel=1, channel_in_between=[], to_remain_size=False, image_size=None):
-        super(UNetBase, self).__init__()
+    def __init__(self, *, channel_in_between=[], to_remain_size=False, image_size=None):
+        super().__init__()
 
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
 
+        self.channel_in_between = channel_in_between
         self.to_remain_size = to_remain_size
         if to_remain_size:
-            self.image_size = image_size
+            self.image_size = image_size 
 
-        self.encoder = UNetEncoder(input_channel, channel_in_between)
-        self.middle_layer = self._build_middle_layer(channel_in_between[-1], middle_channel)
-        self.decoder = UNetDecoder(middle_channel, channel_in_between[::-1])
-        self.output_layer = nn.Conv2d(channel_in_between[0], output_channel, kernel_size=1)
+
+class UNet(UNetBase):
+    """
+    Architecture:
+     encoder               decoder --> output_layer
+        |                     ^ 
+        |                     |
+          ->  middle_layer --
+    """
+    def __init__(
+        self,
+        input_channel=1, 
+        middle_channel=1024, 
+        output_channel=1, 
+        **kwargs
+        ):
+        super().__init__(**kwargs)
+
+        self.encoder = UNetEncoder(input_channel, self.channel_in_between)
+        self.middle_layer = UNetConvBlock(self.channel_in_between[-1], middle_channel)
+        self.decoder = UNetDecoder(middle_channel, self.channel_in_between[::-1])
+        self.output_layer = nn.Conv2d(self.channel_in_between[0], output_channel, kernel_size=1)
 
     def forward(self, x):
         _, _, h, w = x.shape
@@ -105,28 +124,3 @@ class UNetBase(nn.Module):
             )
             
         return x
-        
-    @abstractmethod
-    def _build_middle_layer(self, in_channel, out_channel):
-        ...
-
-
-class UNet(UNetBase):
-    def _build_middle_layer(self, in_channel, out_channel):
-        return UNetConvBlock(in_channel, out_channel)
-
-
-if __name__ == "__main__":
-
-    unet = UNet(
-        input_channel=3,
-        middle_channel=1024,
-        output_channel=10,
-        channel_in_between=[64, 128, 256, 512],
-        to_remain_size=True
-    )
-    print(unet)
-
-    x = torch.randn(1, 3, 572, 572)
-
-    print(unet(x).shape)

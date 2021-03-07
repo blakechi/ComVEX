@@ -8,8 +8,8 @@ class ResNetBlockBase(nn.Module):
     """
     def __init__(
         self,
-        in_channels,
-        out_channels,
+        input_channel,
+        output_channel,
         *,
         stride=None,
         padding=None,
@@ -20,39 +20,39 @@ class ResNetBlockBase(nn.Module):
         if stride is not None:
             self.stride = stride
         else:
-            self.stride = 1 if in_channels == out_channels else 2
+            self.stride = 1 if input_channel == output_channel else 2
 
         self.padding = padding if padding is not None else 1
         self.norm = nn.BatchNorm2d if norm_layer is None else norm_layer
         self.down_sampling = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 1, self.stride),
-            self.norm(out_channels)
+            nn.Conv2d(input_channel, output_channel, 1, self.stride),
+            self.norm(output_channel)
         ) if self.stride != 1 else None
 
 
 class ResNetBlock(ResNetBlockBase):
     def __init__(
-        self, in_channels, out_channels, **kwargs):
-        super().__init__(in_channels, out_channels, **kwargs)
+        self, input_channel, output_channel, **kwargs):
+        super().__init__(input_channel, output_channel, **kwargs)
 
         self.layers = nn.Sequential(
             nn.Conv2d(
-                in_channels, 
-                out_channels, 
+                input_channel, 
+                output_channel, 
                 3, 
                 self.stride, 
                 self.padding
             ),
-            self.norm(num_features=out_channels),
+            self.norm(num_features=output_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                out_channels, 
-                out_channels, 
+                output_channel, 
+                output_channel, 
                 3, 
                 self.stride, 
                 self.padding
             ),
-            self.norm(num_features=out_channels)
+            self.norm(num_features=output_channel)
         )
         self.relu = nn.ReLU(inplace=True)  # after addition
 
@@ -69,54 +69,54 @@ class ResNetBottleneck(ResNetBlock):
 
         self.layers = nn.Sequential(
             nn.Conv2d(
-                in_channels, 
-                in_channels, 
+                input_channel, 
+                input_channel, 
                 1, 
                 self.stride, 
                 self.padding
             ),
-            self.norm(num_features=in_channels),
+            self.norm(num_features=input_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels, 
-                in_channels, 
+                input_channel, 
+                input_channel, 
                 3, 
                 self.stride, 
                 self.padding
             ),
-            self.norm(num_features=in_channels),
+            self.norm(num_features=input_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels, 
-                out_channels, 
+                input_channel, 
+                output_channel, 
                 1, 
                 self.stride, 
                 self.padding
             ),
-            self.norm(num_features=out_channels)
+            self.norm(num_features=output_channel)
         )
         self.relu = nn.ReLU(inplace=True)  # after addition
 
 
 class ResNetFullPreActivation(ResNetBlockBase):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super().__init__(in_channels, out_channels, **kwargs)
+    def __init__(self, input_channel, output_channel, **kwargs):
+        super().__init__(input_channel, output_channel, **kwargs)
 
         self.layers = nn.Sequential(
-            self.norm(out_channels),
+            self.norm(output_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels,
-                out_channels,
+                input_channel,
+                output_channel,
                 3,
                 self.stride,
                 self.padding
             ),
-            self.norm(out_channels),
+            self.norm(output_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels,
-                out_channels,
+                input_channel,
+                output_channel,
                 3,
                 self.stride,
                 self.padding
@@ -131,33 +131,33 @@ class ResNetFullPreActivation(ResNetBlockBase):
 
 
 class ResNetFullPreActivationBottleneck(ResNetFullPreActivation):
-    def __init__(self, in_channels, out_channels, **kwargs):
-        super().__init__(in_channels, out_channels, **kwargs)
+    def __init__(self, input_channel, output_channel, **kwargs):
+        super().__init__(input_channel, output_channel, **kwargs)
 
         self.layers = nn.Sequential(
-            self.norm(in_channels),
+            self.norm(input_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels,
-                in_channels,
+                input_channel,
+                input_channel,
                 1,
                 1,
                 0
             ),
-            self.norm(in_channels),
+            self.norm(input_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels,
-                in_channels,
+                input_channel,
+                input_channel,
                 3,
                 self.stride,
                 self.padding
             ),
-            self.norm(in_channels),
+            self.norm(input_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
-                in_channels,
-                out_channels,
+                input_channel,
+                output_channel,
                 1,
                 1,
                 0

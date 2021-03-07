@@ -3,10 +3,29 @@ from torch import nn
 from einops import rearrange
 
 from models.transformer import Transformer
-from models.utils import Residual, Norm, FeedForward
+from models.utils import FeedForward
 
 
-class ViT(nn.Module):
+class ViTBase(nn.Module):
+    def __init__(self, img_size, patch_size, dim, num_heads):
+        super().__init__()
+
+        self.num_patches = (img_size // patch_size) ** 2
+        patch_dim = patch_size * patch_size * 3
+
+        assert (
+            (self.num_patches**0.5) * patch_size == img_size
+        ), "Token dimensions must be divided by the number of heads"
+
+        dim = dim
+        head_dim = dim // num_heads
+
+        assert (
+            head_dim * num_heads == dim
+        ), "Token dimensions must be divided by the number of heads"
+
+
+class ViT(ViTBase):
     def __init__(
         self,
         img_size,    # one lateral's size of a squre image
@@ -21,22 +40,7 @@ class ViT(nn.Module):
         *,
         self_defined_transformer=None,
     ):
-        super(ViT, self).__init__()
-
-        self.num_patches = (img_size // patch_size) ** 2
-        patch_dim = patch_size * patch_size * 3
-
-        assert (
-            (self.num_patches**0.5) * patch_size == img_size
-        ), "Token dimensions must be divided by the number of heads"
-
-        dim = dim
-        num_heads = num_heads
-        head_dim = dim // num_heads
-
-        assert (
-            head_dim * num_heads == dim
-        ), "Token dimensions must be divided by the number of heads"
+        super().__init__(img_size, patch_size, dim, num_heads)
 
         self.linear_proj_patches = nn.Linear(patch_dim, dim, bias=False)
         self.CLS = nn.Parameter(torch.randn(1, 1, dim))

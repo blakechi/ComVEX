@@ -1,1 +1,1 @@
-from .model import ViT
+from .model import ViTBase, ViT
