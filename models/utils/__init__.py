@@ -9,5 +9,5 @@ __all__ = [
     "Residual", "Norm", "FeedForward",
     "MultiheadAttention",
     "ResNetBlockBase", "ResNetBlock", "ResNetBottleneck", "ResNetFullPreActivation", "ResNetFullPreActivationBottleneck",
-    "UNetBase", "UNetConvBlock", "UNetEncoder", "UNetDecoder", "UNet"
+    "UNetBase", "UNetConvBlock", "UNetEncoder", "UNetDecoder", "UNet",
 ]
