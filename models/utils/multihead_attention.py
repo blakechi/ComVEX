@@ -1,11 +1,11 @@
 import torch
-from torch import nn
+from torch import nn, einsum
 from einops import rearrange, repeat
 
 
 class MultiheadAttention(nn.Module):
     def __init__(self, *, embedding_dim, heads=4, head_dim=None):
-        super(MultiheadAttention, self).__init__()
+        super().__init__()
 
         self.embedding_dim = embedding_dim
         self.heads = heads
@@ -22,6 +22,11 @@ class MultiheadAttention(nn.Module):
         self.mask_value = -torch.finfo(torch.float32).max  # pytorch default float type
 
     def forward(self, x, att_mask=None):
+        """
+        Args:
+            x (b, n, d): input tensors
+            att_mask (b n m): Use True or 1 to mask out attention weights and False or 0 for opposite.
+        """
         b, n, d, h = *x.shape, self.heads
 
         q, k, v = self.QKV(x).chunk(3, dim=-1)
@@ -30,9 +35,9 @@ class MultiheadAttention(nn.Module):
         q = q * self.scale
         similarity = einsum("b h n d, b h m d -> b h n m", q, k)  # m=n
 
-        if att_mask:
+        if att_mask is not None:
             att_mask = repeat(att_mask, "b 1 n m -> b h n m", h=h)
-            similarity.masked_fill_(~att_mask, self.mask_value)
+            similarity.masked_fill_(att_mask, self.mask_value)
 
         # attention
         similarity = similarity.softmax(dim=-1)

@@ -10,18 +10,18 @@ from models.utils import FeedForward, UNetBase, UNetDecoder, ResNetFullPreActiva
 class TransUNetViT(ViTBase):
     def __init__(
         self,
-        img_size=256,
-        patch_size=16,  # one lateral's size of a squre patch
-        input_channel=256,
+        patch_size=16,   # one lateral's size of a squre patch
         dim=512,         # tokens' dimension
-        num_heads,
-        num_layers,
-        feedforward_dim,
+        num_heads=4,
+        num_layers=12,
         dropout=0.0,
         *,
+        image_size=None,
+        input_channel=None,
+        feedforward_dim=None,
         self_defined_transformer=None,
-    ):
-        super().__init__(img_size, patch_size, dim, num_heads)
+        ):
+        super().__init__(image_size, patch_size, dim, num_heads)
 
         self.proj_patches = nn.Sequential(
             nn.Conv2d(
@@ -30,10 +30,13 @@ class TransUNetViT(ViTBase):
                 kernel_size=patch_size, 
                 stride=patch_size
             ),
-            Rearrange("b d p p_ -> b (p p_) d")
+            Rearrange("b d p q -> b (p q) d")
         )
+        print(self.num_patches)
         self.position_code = nn.Parameter(torch.randn(1, self.num_patches, dim))
         self.token_dropout = nn.Dropout(dropout)
+
+        feedforward_dim = feedforward_dim if feedforward_dim is not None else 2*dim
 
         self.transformer = (
             self_defined_transformer
@@ -42,7 +45,7 @@ class TransUNetViT(ViTBase):
                 dim=dim, 
                 heads=num_heads,
                 depth=num_layers,
-                ff_dim=feedforward_dim ,
+                ff_dim=feedforward_dim,
                 ff_dropout=dropout,
                 max_seq_len=self.num_patches
             )
@@ -67,27 +70,28 @@ class TransUNetViT(ViTBase):
 
 
 class TransUNetEncoder(nn.Module):
-    def __init__(self, input_channel=1, channel_in_between=[]):
+    def __init__(self, image_size, dim, num_heads, num_layers, ff_dim, ff_dropout, input_channel=1, channel_in_between=[]):
         super().__init__()
         
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
+        vit_image_size = image_size*(2**(-len(channel_in_between)))
 
         channel_in_between = [input_channel] + channel_in_between
         self.layers = nn.ModuleList([
-            nn.ModuleList([
-                ResNetFullPreActivationBottleneck(channel_in_between[idx], channel_in_between[idx + 1]),
-            ]) 
+
+            ResNetFullPreActivationBottleneck(channel_in_between[idx], channel_in_between[idx + 1])
+
             for idx in range(len(channel_in_between) - 1)
         ])
         self.vit = TransUNetViT(
-            img_size=256,
+            image_size=vit_image_size,
             patch_size=16,
             input_channel=256,
-            dim=512,
+            dim=dim,
             num_heads=num_heads,
             num_layers=num_layers,
-            feedforward_dim=feedforward_dim,
-            dropout=dropout
+            feedforward_dim=ff_dim,
+            dropout=ff_dropout
         )
 
     def forward(self, x):
@@ -111,26 +115,37 @@ class TransUNet(UNetBase):
     """
     def __init__(
         self,
-        input_channel=1, 
-        middle_channel=1024, 
-        output_channel=1, 
+        input_channel, 
+        middle_channel, 
+        output_channel, 
+        image_size,
         patch_size=16,
         vit_dim=512,
         vit_num_heads=16,
         vit_num_layers=12,
         vit_feedforward_dim=2048,
         vit_dropout=0,
-        **kwargs
-        ):
-        super().__init__(**kwargs)
+        channel_in_between=[],
+        to_remain_size=False
+    ):
+        super().__init__(channel_in_between=channel_in_between, to_remain_size=to_remain_size)
 
-        self.encoder = TransUNetEncoder()
-        self.middle_layer = Rearrange("b (p p_) d -> b d p p_", p=patch_size, p_=patch_size)
+        self.encoder = TransUNetEncoder(
+            image_size,
+            vit_dim,
+            vit_num_heads,
+            vit_num_layers,
+            vit_feedforward_dim,
+            vit_dropout,
+            input_channel, 
+            channel_in_between,
+        )
+        self.middle_layer = Rearrange("b (p q) d -> b d p q", p=patch_size, q=patch_size)
         self.decoder = UNetDecoder(middle_channel, self.channel_in_between[::-1])
         self.output_layer = nn.Conv2d(self.channel_in_between[0], output_channel, kernel_size=1)  # kernel_size == 3 in the offical code
 
     def forward(self, x):
-        b, c, h, w = *x.shape
+        b, c, h, w = x.shape
 
         x, hidden_xs = self.encoder(x)
         x = self.middle_layer(x)

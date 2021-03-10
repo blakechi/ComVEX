@@ -6,33 +6,31 @@ from einops import rearrange, repeat
 from models.utils import Residual, Norm, FeedForward, MultiheadAttention
 
 
-class TransformerEncoder(nn.Module):
+class TransformerEncoderLayer(nn.Module):
     def __init__(self, *, dim, heads, head_dim, ff_dim, ff_dropout):
         super().__init__()
 
-        self.layers = nn.ModuleList(
-            [
-                Residual(
-                    Norm(
-                        MultiheadAttention(
-                            embedding_dim=dim, heads=heads, head_dim=head_dim
-                        ),
-                        dim=dim,
+        self._net = nn.Sequential(
+            Residual(
+                Norm(
+                    MultiheadAttention(
+                        embedding_dim=dim, heads=heads, head_dim=head_dim
                     ),
+                    dim=dim,
                 ),
-                Residual(
-                    Norm(
-                        FeedForward(
-                            dim=dim, hidden_dim=ff_dim, dropout=ff_dropout
-                        ),
-                        dim=dim,
+            ),
+            Residual(
+                Norm(
+                    FeedForward(
+                        dim=dim, hidden_dim=ff_dim, dropout=ff_dropout
                     ),
+                    dim=dim,
                 ),
-            ]
+            )
         )
 
     def forward(self, x):
-        return self.layers(x)
+        return self._net(x)
 
 
 class Transformer(nn.Module):
@@ -45,9 +43,9 @@ class Transformer(nn.Module):
         self.heads = heads
         self.max_seq_len = max_seq_len
 
-        self.head_dim = head_dim if head_dim is not None else embedding_dim // heads
+        self.head_dim = head_dim if head_dim is not None else dim // heads
         assert (
-            self.head_dim * self.heads == self.embedding_dim
+            self.head_dim * self.heads == self.dim
         ), "Head dimension times the number of heads must be equal to embedding dimension"
 
         self.layers = nn.ModuleList([
@@ -78,11 +76,7 @@ class Transformer(nn.Module):
                 "b n m -> b 1 n m",
             )
 
-        for (attn, ff) in self.layers:
-            x = attn(
-                x,
-                att_mask=att_mask,
-            )
-            x = ff(x)
+        for layer in self.layers:
+            x = layer(x)
 
         return x

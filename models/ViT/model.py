@@ -7,15 +7,18 @@ from models.utils import FeedForward
 
 
 class ViTBase(nn.Module):
-    def __init__(self, img_size, patch_size, dim, num_heads):
+    def __init__(self, image_size, patch_size, dim, num_heads):
         super().__init__()
 
-        self.num_patches = (img_size // patch_size) ** 2
-        patch_dim = patch_size * patch_size * 3
+        assert image_size is not None, f"[{self.__class__.__name__}] Please specify input images' size."
+        assert patch_size is not None, f"[{self.__class__.__name__}] Please specify patches' size."
+
+        self.num_patches = int(image_size // patch_size) ** 2
+        self.patch_dim = patch_size * patch_size * 3  # For normal images
 
         assert (
-            (self.num_patches**0.5) * patch_size == img_size
-        ), "Token dimensions must be divided by the number of heads"
+            (self.num_patches**0.5) * patch_size == image_size
+        ), f"[{self.__class__.__name__}] Token dimensions must be divided by the number of heads."
 
         dim = dim
         head_dim = dim // num_heads
@@ -28,7 +31,7 @@ class ViTBase(nn.Module):
 class ViT(ViTBase):
     def __init__(
         self,
-        img_size,    # one lateral's size of a squre image
+        image_size,    # one lateral's size of a squre image
         patch_size,  # one lateral's size of a squre patch
         num_classes,
         dim,         # tokens' dimension
@@ -40,9 +43,9 @@ class ViT(ViTBase):
         *,
         self_defined_transformer=None,
     ):
-        super().__init__(img_size, patch_size, dim, num_heads)
+        super().__init__(image_size, patch_size, dim, num_heads)
 
-        self.linear_proj_patches = nn.Linear(patch_dim, dim, bias=False)
+        self.linear_proj_patches = nn.Linear(self.patch_dim, dim, bias=False)
         self.CLS = nn.Parameter(torch.randn(1, 1, dim))
         self.position_code = nn.Parameter(torch.randn(1, self.num_patches + 1, dim))
         self.token_dropout = nn.Dropout(dropout)
@@ -96,7 +99,7 @@ class ViT(ViTBase):
 if __name__ == "__main__":
     
     vit = ViT(
-        img_size=1024,
+        image_size=1024,
         patch_size=32,
         num_classes=6,
         dim=64,
