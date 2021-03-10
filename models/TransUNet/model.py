@@ -114,12 +114,18 @@ class TransUNet(UNetBase):
         input_channel=1, 
         middle_channel=1024, 
         output_channel=1, 
+        patch_size=16,
+        vit_dim=512,
+        vit_num_heads=16,
+        vit_num_layers=12,
+        vit_feedforward_dim=2048,
+        vit_dropout=0,
         **kwargs
         ):
         super().__init__(**kwargs)
 
         self.encoder = TransUNetEncoder()
-        self.middle_layer = Rearrange("b (p p_) d -> b d p p_", p=self.patch_size, p_=self.patch_size)
+        self.middle_layer = Rearrange("b (p p_) d -> b d p p_", p=patch_size, p_=patch_size)
         self.decoder = UNetDecoder(middle_channel, self.channel_in_between[::-1])
         self.output_layer = nn.Conv2d(self.channel_in_between[0], output_channel, kernel_size=1)  # kernel_size == 3 in the offical code
 
@@ -145,7 +151,13 @@ if __name__ == "__main__":
         input_channel=3,
         middle_channel=1024,
         output_channel=10,
-        channel_in_between=[64, 128, 256, 512],
+        patch_size=16,
+        vit_dim=512,
+        vit_num_heads=16,
+        vit_num_layers=12,
+        vit_feedforward_dim=2048,
+        vit_dropout=0,
+        channel_in_between=[64, 128, 256],
         to_remain_size=True
     )
     print(transUnet)
