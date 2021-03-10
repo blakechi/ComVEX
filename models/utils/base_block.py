@@ -5,7 +5,7 @@ class Residual(nn.Module):
     def __init__(self, fn):
         super(Residual, self).__init__()
 
-        assert fn is not None, "[Residual] Must give it a function (normaly, a neural net)"
+        assert fn is not None, f"[{self.__class__.__name__}] Must give it a function (normaly, a neural net)"
         self._fn = fn
 
     def forward(self, x, *args, **kwargs):
@@ -45,7 +45,7 @@ class MaskLayerNorm(Norm):
         else:
             x = self._norm(x)
 
-        assert norm_mask is not None, f"[{self.__class__.name}] norm_mask isn't provided."
+        assert norm_mask is not None, f"[{self.__class__.__name__}] norm_mask isn't provided."
         norm_mask = norm_mask.to(x.dtype).unsqueeze(dim=-1)
 
         return x*norm_mask
@@ -54,8 +54,8 @@ class MaskLayerNorm(Norm):
 class FeedForward(nn.Module):
     def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, dropout=0.0, useResidualWithNorm=False):
         super().__init__()
-        assert dim is not None, "[FeedForward] Must specify the input dim"
-        assert hidden_dim is not None, "[FeedForward] Must specify the hidden dim"
+        assert dim is not None, f"[{self.__class__.__name__}] Must specify the input dim"
+        assert hidden_dim is not None, f"[{self.__class__.__name__}] Must specify the hidden dim"
 
         out_dim = output_dim if output_dim is not None else dim
 
