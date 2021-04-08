@@ -7,25 +7,26 @@ from models.utils import FeedForward
 
 
 class ViTBase(nn.Module):
-    def __init__(self, image_size, patch_size, dim, num_heads):
+    def __init__(self, image_size, patch_size, dim, num_heads, image_channel=3, head_dim=None):
         super().__init__()
 
         assert image_size is not None, f"[{self.__class__.__name__}] Please specify input images' size."
         assert patch_size is not None, f"[{self.__class__.__name__}] Please specify patches' size."
 
-        self.num_patches = int(image_size // patch_size) ** 2
-        self.patch_dim = patch_size * patch_size * 3  # For normal images
+        self.dim = dim
+        self.num_heads = num_heads
+        self.head_dim = head_dim if head_dim is not None else dim // num_heads
+        self.num_patches = (image_size // patch_size) ** 2
+        self.patch_dim = patch_size * patch_size * image_channel
+        self.patch_size = patch_size
+
+        assert (
+            self.head_dim * self.num_heads == self.dim
+        ), "Token dimensions must be divided by the number of heads"
 
         assert (
             (self.num_patches**0.5) * patch_size == image_size
-        ), f"[{self.__class__.__name__}] Token dimensions must be divided by the number of heads."
-
-        dim = dim
-        head_dim = dim // num_heads
-
-        assert (
-            head_dim * num_heads == dim
-        ), "Token dimensions must be divided by the number of heads"
+        ), f"[{self.__class__.__name__}] Image size must be divided by the patch size."
 
 
 class ViT(ViTBase):
@@ -45,27 +46,27 @@ class ViT(ViTBase):
     ):
         super().__init__(image_size, patch_size, dim, num_heads)
 
-        self.linear_proj_patches = nn.Linear(self.patch_dim, dim, bias=False)
-        self.CLS = nn.Parameter(torch.randn(1, 1, dim))
-        self.position_code = nn.Parameter(torch.randn(1, self.num_patches + 1, dim))
+        self.linear_proj_patches = nn.Linear(self.patch_dim, self.dim, bias=False)
+        self.CLS = nn.Parameter(torch.randn(1, 1, self.dim))
+        self.position_code = nn.Parameter(torch.randn(1, self.num_patches + 1, self.dim))
         self.token_dropout = nn.Dropout(dropout)
 
         self.transformer = (
             self_defined_transformer
             if self_defined_transformer is not None
             else Transformer(
-                dim=dim, 
-                heads=num_heads,
+                dim=self.dim, 
+                head_dim=self.head_dim,
                 depth=num_layers,
                 ff_dim=feedforward_dim ,
                 ff_dropout=dropout,
-                max_seq_len=self.num_patches
+                max_seq_len=self.num_patches,
             )
         )
 
         self.proj_head = FeedForward(
-            dim=dim,
-            hidden_dim=dim,
+            dim=self.dim,
+            hidden_dim=self.dim,
             output_dim=num_classes,
             dropout=proj_head_dropout,
             useResidualWithNorm=True,

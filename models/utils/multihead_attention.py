@@ -21,11 +21,11 @@ class MultiheadAttention(nn.Module):
         self.scale = self.head_dim ** (-0.5)
         self.mask_value = -torch.finfo(torch.float32).max  # pytorch default float type
 
-    def forward(self, x, att_mask=None):
+    def forward(self, x, attention_mask=None):
         """
         Args:
             x (b, n, d): input tensors
-            att_mask (b n m): Use True or 1 to mask out attention weights and False or 0 for opposite.
+            attention_mask (b n m): Use True or 1 to mask out attention weights and False or 0 for opposite.
         """
         b, n, d, h = *x.shape, self.heads
 
@@ -35,9 +35,9 @@ class MultiheadAttention(nn.Module):
         q = q * self.scale
         similarity = einsum("b h n d, b h m d -> b h n m", q, k)  # m=n
 
-        if att_mask is not None:
-            att_mask = repeat(att_mask, "b 1 n m -> b h n m", h=h)
-            similarity.masked_fill_(att_mask, self.mask_value)
+        if attention_mask is not None:
+            attention_mask = repeat(attention_mask, "b 1 n m -> b h n m", h=h)
+            similarity.masked_fill_(attention_mask, self.mask_value)
 
         # attention
         similarity = similarity.softmax(dim=-1)

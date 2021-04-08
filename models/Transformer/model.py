@@ -35,7 +35,7 @@ class TransformerEncoderLayer(nn.Module):
 
 class Transformer(nn.Module):
     def __init__(
-        self, *, dim, heads, depth=12, head_dim=None, ff_dim=None, ff_dropout=0.0, max_seq_len=128
+        self, *, dim, heads, head_dim=None, depth=12, ff_dim=None, ff_dropout=0.0, max_seq_len=128
     ):
         super().__init__()
         self.dim = dim
