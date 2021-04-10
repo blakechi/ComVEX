@@ -20,6 +20,19 @@ class UNetConvBlock(nn.Module):
         return self.net(x)
 
 
+class UNetBilinearUpsamplingBlock(nn.Module):
+    def __init__(self, in_channel, out_channel):
+        super().__init__()
+
+        self.net = nn.Sequential(
+            nn.UpsamplingBilinear2d(scale_factor=2),
+            nn.Conv2d(in_channel, out_channel, kernel_size=1, stride=1),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
 class UNetEncoder(nn.Module):
     def __init__(self, input_channel=1, channel_in_between=[]):
         super().__init__()
@@ -46,7 +59,7 @@ class UNetEncoder(nn.Module):
 
 
 class UNetDecoder(nn.Module):
-    def __init__(self, middle_channel=1024, channel_in_between=[]):
+    def __init__(self, middle_channel=1024, channel_in_between=[], usebilinearUpsampling=False):
         super().__init__()
 
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
@@ -55,17 +68,17 @@ class UNetDecoder(nn.Module):
         self.layers = nn.ModuleList([
             nn.ModuleList([
                 UNetConvBlock(channel_in_between[idx], channel_in_between[idx + 1]),
-                nn.ConvTranspose2d(channel_in_between[idx], channel_in_between[idx + 1], kernel_size=2, stride=2)
+                nn.ConvTranspose2d(channel_in_between[idx], channel_in_between[idx + 1], kernel_size=2, stride=2) if not usebilinearUpsampling else UNetBilinearUpsamplingBlock(channel_in_between[idx], channel_in_between[idx + 1])
             ]) 
             for idx in range(len(channel_in_between) - 1)
         ])
 
     def forward(self, x, hidden_xs):
         for (convBlock, upSampling), hidden_x in zip(self.layers, hidden_xs):
-            x = convBlock(x)
+            x = upSampling(x)
             hidden_x = self.crop(hidden_x, x.shape)
             x = torch.cat([hidden_x, x], dim=1)
-            x = upSampling(x)
+            x = convBlock(x)
 
         return x
 
@@ -79,11 +92,12 @@ class UNetBase(nn.Module):
     def __init__(self, *, channel_in_between=[], to_remain_size=False, image_size=None):
         super().__init__()
 
-        assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
+        assert isinstance(channel_in_between, list) or len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
 
         self.channel_in_between = channel_in_between
         self.to_remain_size = to_remain_size
         if to_remain_size:
+            assert image_size is not None, f"[{self.__class__.__name__}] Please specify the image size to remain output size as the input."
             self.image_size = image_size 
 
 
