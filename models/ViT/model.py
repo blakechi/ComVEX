@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from einops import rearrange
+from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
 from models.transformer import Transformer
@@ -50,7 +50,7 @@ class ViT(ViTBase):
     ):
         super().__init__(image_size, image_channel, patch_size, dim, num_heads)
 
-        self.linear_proj_patches = nn.Linear(self.patch_dim, self.dim, bias=False)
+        self.linear_proj = nn.Linear(self.patch_dim, self.dim, bias=False)
         self.CLS = nn.Parameter(torch.randn(1, 1, self.dim))
         self.position_code = nn.Parameter(torch.randn(1, self.num_patches + 1, self.dim))  # plus 1 for CLS
         self.token_dropout = nn.Dropout(token_dropout)
@@ -73,7 +73,6 @@ class ViT(ViTBase):
             dim=self.dim,
             hidden_dim=self.dim,
             output_dim=num_classes,
-            useResidualWithNorm=True,
         )
 
     def forward(self, x, att_mask=None, padding_mask=None):
@@ -83,20 +82,20 @@ class ViT(ViTBase):
         x = self.flatten_to_patch(x)
 
         # Linear projection
-        x = self.linear_proj_patches(x)
+        x = self.linear_proj(x)
+
+        # Token dropout
+        x = self.token_dropout(x)
 
         # Prepend CLS token and add position code
         CLS = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
         x = torch.cat([CLS, x], dim=1) + self.position_code
         
-        # Token dropout
-        x = self.token_dropout(x)
-        
         # Transformer
         x = self.transformer(x)
 
         # Projection head
-        cls_output = x[..., 0, :]
+        cls_output = x[:, 0, :]
         
         return self.proj_head(cls_output)
 

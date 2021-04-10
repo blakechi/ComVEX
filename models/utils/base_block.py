@@ -13,7 +13,7 @@ class Residual(nn.Module):
 
 
 class Norm(nn.Module):
-    def __init__(self, fn=None, *, dim, use_pre_norm=False):
+    def __init__(self, fn=None, *, dim=None, use_pre_norm=False):
         super(Norm, self).__init__()
         self._fn = fn
         self._norm = nn.LayerNorm(dim)
@@ -52,25 +52,23 @@ class MaskLayerNorm(Norm):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, dropout=0.0, useResidualWithNorm=False):
+    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, dropout=0.0, useNorm=False):
         super().__init__()
         assert dim is not None, f"[{self.__class__.__name__}] Must specify the input dim"
         assert hidden_dim is not None, f"[{self.__class__.__name__}] Must specify the hidden dim"
 
         out_dim = output_dim if output_dim is not None else dim
 
-        if useResidualWithNorm:
+        if useNorm:
             self._net = nn.Sequential(
-                Residual(
-                    Norm(
-                        nn.Sequential(
-                            nn.Linear(dim, hidden_dim),
-                            nn.GELU(),
-                            nn.Dropout(dropout),
-                        ),
-                        dim=dim
-                    )
+                Norm(
+                    nn.Sequential(
+                        nn.Linear(dim, hidden_dim),
+                        nn.Dropout(dropout),
+                    ),
+                    dim=dim
                 ),
+                nn.GELU(),
                 Norm(
                     nn.Linear(hidden_dim, out_dim),
                     dim=hidden_dim

@@ -16,5 +16,12 @@ if __name__ == "__main__":
         num_classes=2,
         dim=512,
         num_heads=16,
-        num_layers=12,
+        num_layers=12
     )
+
+    print(vit)
+
+    x = torch.randn(1, 1, 224, 224)
+
+    print("Input Shape:\n", x.shape)
+    print("Output Shape:\n", vit(x).shape)

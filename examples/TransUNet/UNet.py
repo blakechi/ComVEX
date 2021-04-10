@@ -8,6 +8,7 @@ from models.utils import UNet
 
 
 if __name__ == "__main__":
+    
     unet = UNet(
         input_channel=3,
         middle_channel=1024,

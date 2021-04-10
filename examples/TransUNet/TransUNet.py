@@ -8,6 +8,7 @@ from models.transunet import TransUNet
 
 
 if __name__ == "__main__":
+    
     transUnet = TransUNet(
         input_channel=3,
         middle_channel=512,
