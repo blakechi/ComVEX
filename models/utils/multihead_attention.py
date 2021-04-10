@@ -15,7 +15,9 @@ class MultiheadAttention(nn.Module):
             self.head_dim * self.heads == self.embedding_dim
         ), "Head dimension times the number of heads must be equal to embedding dimension"
 
-        self.QKV = nn.Linear(embedding_dim, 3 * embedding_dim, bias=False)
+        self.Q = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.K = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.V = nn.Linear(embedding_dim, embedding_dim, bias=False)
         self.out_linear = nn.Linear(embedding_dim, embedding_dim)
 
         self.scale = self.head_dim ** (-0.5)
@@ -24,12 +26,16 @@ class MultiheadAttention(nn.Module):
     def forward(self, x, attention_mask=None):
         """
         Args:
-            x (b, n, d): input tensors
+            x (b, n, d) or ((b, n, d), (b, n, d), (b, n, d)): input tensors, if its a list, the order represents (q, k, v)
             attention_mask (b n m): Use True or 1 to mask out attention weights and False or 0 for opposite.
         """
-        b, n, d, h = *x.shape, self.heads
+        if isinstance(x, tuple):
+            b, n, d, h = *x[0].shape, self.heads
+            q, k, v = map(lambda proj, token: proj(token), zip((self.Q, self.K, self.V), x))
+        else:
+            b, n, d, h = *x.shape, self.heads
+            q, k, v = map(lambda proj: proj(x), (self.Q, self.K, self.V))
 
-        q, k, v = self.QKV(x).chunk(3, dim=-1)
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (q, k, v))
 
         q = q * self.scale
