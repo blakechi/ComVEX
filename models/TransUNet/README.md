@@ -13,9 +13,7 @@ This is an implementation of the paper [TransUNet: Transformers Make Strong Enco
 4. **Output size** \
    Use `torch.nn.functional.interpolate` to enlarge the output size to the input one.
 
-## Examples
-
-1. Usage
+## Usage
 
 ```python
 from models.transunet import TransUNet
@@ -37,7 +35,7 @@ transUnet = TransUNet(
 )
 ```
 
-2. Demo
+## Demo
 
 ```bash
 python examples/TransUNet/TransUNet.py
