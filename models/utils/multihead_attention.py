@@ -4,21 +4,24 @@ from einops import rearrange, repeat
 
 
 class MultiheadAttention(nn.Module):
-    def __init__(self, *, embedding_dim, heads=4, head_dim=None):
+    def __init__(self, *, dim, heads, kv_dim=None, head_dim=None, ff_dropout=0.0):
         super().__init__()
 
-        self.embedding_dim = embedding_dim
+        self.dim = dim
         self.heads = heads
-        self.head_dim = head_dim if head_dim is not None else embedding_dim // heads
+        self.head_dim = head_dim if head_dim is not None else dim // heads
 
         assert (
-            self.head_dim * self.heads == self.embedding_dim
+            self.head_dim * self.heads == self.dim
         ), "Head dimension times the number of heads must be equal to embedding dimension"
 
-        self.Q = nn.Linear(embedding_dim, embedding_dim, bias=False)
-        self.K = nn.Linear(embedding_dim, embedding_dim, bias=False)
-        self.V = nn.Linear(embedding_dim, embedding_dim, bias=False)
-        self.out_linear = nn.Linear(embedding_dim, embedding_dim)
+        self.Q = nn.Linear(dim, dim, bias=False)
+        self.K = nn.Linear(dim if kv_dim is None else kv_dim, dim, bias=False)
+        self.V = nn.Linear(dim if kv_dim is None else kv_dim, dim, bias=False)
+        self.out_linear = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.Dropout(ff_dropout)
+        )
 
         self.scale = self.head_dim ** (-0.5)
         self.mask_value = -torch.finfo(torch.float32).max  # pytorch default float type

@@ -42,8 +42,9 @@ class ViT(ViTBase):
         *,
         dim,         # tokens' dimension
         num_heads,
-        num_layers,
-        ff_dim=None,
+        depth,
+        pre_norm=True,
+        ff_dim=None,                    # If not specify, ff_dim = 4*dim
         ff_dropout=0.0,
         token_dropout=0.0,
         self_defined_transformer=None,
@@ -60,12 +61,12 @@ class ViT(ViTBase):
             if self_defined_transformer is not None
             else Transformer(
                 dim=self.dim, 
+                depth=depth,
                 heads=self.num_heads,
                 head_dim=self.head_dim,
-                depth=num_layers,
-                ff_dim=ff_dim if ff_dim is not None else self.dim*4,
-                ff_dropout=ff_dropout,
-                max_seq_len=self.num_patches,
+                pre_norm=True,
+                ff_dim=None,
+                ff_dropout=0.0,
             )
         )
 

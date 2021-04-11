@@ -13,9 +13,10 @@ vit = ViT(
     patch_size=16,                  # Patch size (one lateral of the square patch)
     num_classes=2,
     dim=512,                        # Token dimension
+    depth=12,
     num_heads=16,
-    num_layers=12,
     # Optional arguments
+    pre_norm=True
     ff_dim=None,                    # If not specify, ff_dim = 4*dim
     ff_dropout=0.0,
     token_dropout=0.0,

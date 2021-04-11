@@ -15,8 +15,10 @@ if __name__ == "__main__":
         patch_size=16,
         num_classes=2,
         dim=512,
+        depth=12,
         num_heads=16,
-        num_layers=12
+        ff_dropout=0.0,
+        pre_norm=True
     )
 
     print(vit)

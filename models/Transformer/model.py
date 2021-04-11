@@ -3,80 +3,71 @@ import torch.nn.functional as F
 from torch import nn, einsum
 from einops import rearrange, repeat
 
-from models.utils import Residual, Norm, FeedForward, MultiheadAttention
+from models.utils import Residual, LayerNorm, FeedForward, MultiheadAttention
 
 
 class TransformerEncoderLayer(nn.Module):
-    def __init__(self, *, dim, heads, head_dim, ff_dim, ff_dropout):
+    def __init__(self, *, dim, heads, pre_norm=False, head_dim=None, ff_dim=None, ff_dropout=0.0):
         super().__init__()
 
-        self._net = nn.Sequential(
+        self.attention_block = LayerNorm(
             Residual(
-                Norm(
-                    MultiheadAttention(
-                        embedding_dim=dim, heads=heads, head_dim=head_dim
-                    ),
-                    dim=dim,
-                ),
+                MultiheadAttention(
+                    dim=dim, heads=heads, head_dim=head_dim
+                )
             ),
+            dim=dim,
+            use_pre_norm=pre_norm
+        )
+        self.ff_block = LayerNorm(
             Residual(
-                Norm(
-                    FeedForward(
-                        dim=dim, hidden_dim=ff_dim, dropout=ff_dropout
-                    ),
-                    dim=dim,
-                ),
-            )
+                FeedForward(
+                    dim=dim, hidden_dim=ff_dim if ff_dim is not None else 4*dim, dropout=ff_dropout
+                )
+            ),
+            dim=dim,
+            use_pre_norm=pre_norm
         )
 
-    def forward(self, x):
-        return self._net(x)
+    def forward(self, x, attention_mask):
+        x = self.attention_block(x, attention_mask)
+
+        return self.ff_block(x)
 
 
 class Transformer(nn.Module):
     def __init__(
-        self, *, dim, heads, head_dim=None, depth=12, ff_dim=None, ff_dropout=0.0, max_seq_len=128
+        self, *, dim, heads, depth=12, **kwargs
     ):
         super().__init__()
         self.dim = dim
         self.depth = depth
         self.heads = heads
-        self.max_seq_len = max_seq_len
-
-        self.head_dim = head_dim if head_dim is not None else dim // heads
-        assert (
-            self.head_dim * self.heads == self.dim
-        ), "Head dimension times the number of heads must be equal to embedding dimension"
 
         self.layers = nn.ModuleList([
             TransformerEncoderLayer(
                 dim=self.dim, 
-                heads=self.heads, 
-                head_dim=self.head_dim, 
-                ff_dim=ff_dim, 
-                ff_dropout=ff_dropout
+                heads=self.heads,  
+                **kwargs
             )
             for _ in range(depth)
         ])
                 
-    def forward(self, x, att_mask=None, padding_mask=None):
-        # device = x.device
+    def make_attention_mask(self, padding_mask):
+        """
+        padding_mask:
 
-        if padding_mask is not None:
-            """
-            att_mask / padding_mask:
+        True:  mask
+        False: ignore
+        """
 
-            True: Ignore
-            False: To mask
-            """
-            att_mask &= rearrange(
-                repeat(
-                    padding_mask[:, :, None], "b n 1 -> b n m", m=att_mask.shape[-1]
-                ),
-                "b n m -> b 1 n m",
-            )
+        return repeat(padding_mask[:, :, None] + padding_mask[:, None, :], "b n m -> b h n m", h=h)
+        
+    def forward(self, x, attention_mask=None, padding_mask=None):
+        if attention_mask is None and padding_mask is not None:
+            attention_mask = make_attention_mask(padding_mask)
 
         for layer in self.layers:
-            x = layer(x)
+            x = layer(x, attention_mask)
 
         return x

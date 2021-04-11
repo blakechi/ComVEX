@@ -12,9 +12,9 @@ class Residual(nn.Module):
         return self._fn(x, *args, **kwargs) + x
 
 
-class Norm(nn.Module):
+class LayerNorm(nn.Module):
     def __init__(self, fn=None, *, dim=None, use_pre_norm=False):
-        super(Norm, self).__init__()
+        super(LayerNorm, self).__init__()
         self._fn = fn
         self._norm = nn.LayerNorm(dim)
         self._use_pre_norm = use_pre_norm
@@ -29,14 +29,14 @@ class Norm(nn.Module):
         return self._norm(x)
 
 
-class MaskLayerNorm(Norm):
-    def forward(self, x, norm_mask=None, *args, **kwargs):
-        """
-        Args:
-            x (b, n, d): input tensor
-            norm_mask (b, n): Int, Bool, or Double type tensor with (1 => remaining), and (0 => mask out).  
-        """
+class MaskLayerNorm(LayerNorm):
+    """
+    Args:
+        x (b, n, d): input tensor
+        norm_mask (b, n) (Bool Tensor): True => to 0, False => ignore 
+    """
 
+    def forward(self, x, norm_mask=None, *args, **kwargs):
         if self._fn:
             if self._use_pre_norm:
                 x = self._fn(self._norm(x), *args, **kwargs)
@@ -45,14 +45,13 @@ class MaskLayerNorm(Norm):
         else:
             x = self._norm(x)
 
-        assert norm_mask is not None, f"[{self.__class__.__name__}] norm_mask isn't provided."
-        norm_mask = norm_mask.to(x.dtype).unsqueeze(dim=-1)
+        assert norm_mask is not None, f"[{self.__class__.__name__}] Please provide `norm_mask`."
 
-        return x*norm_mask
+        return x.masked_fill_(norm_mask, 0)
 
 
 class FeedForward(nn.Module):
-    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, dropout=0.0, useNorm=False):
+    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dropout=0.0, useNorm=False):
         super().__init__()
         assert dim is not None, f"[{self.__class__.__name__}] Must specify the input dim"
         assert hidden_dim is not None, f"[{self.__class__.__name__}] Must specify the hidden dim"
@@ -61,15 +60,15 @@ class FeedForward(nn.Module):
 
         if useNorm:
             self._net = nn.Sequential(
-                Norm(
+                LayerNorm(
                     nn.Sequential(
                         nn.Linear(dim, hidden_dim),
-                        nn.Dropout(dropout),
+                        nn.Dropout(ff_dropout),
                     ),
                     dim=dim
                 ),
                 nn.GELU(),
-                Norm(
+                LayerNorm(
                     nn.Linear(hidden_dim, out_dim),
                     dim=hidden_dim
                 ),
@@ -78,7 +77,7 @@ class FeedForward(nn.Module):
             self._net = nn.Sequential(
                 nn.Linear(dim, hidden_dim),
                 nn.GELU(),
-                nn.Dropout(dropout),
+                nn.Dropout(ff_dropout),
                 nn.Linear(hidden_dim, out_dim),
             )
 
