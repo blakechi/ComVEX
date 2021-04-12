@@ -93,7 +93,8 @@ class ISAB(nn.Module):
         ff_dropout=0.0, 
         ff_dim_scale=4, 
         pre_norm=False, 
-        head_dim=None
+        head_dim=None,
+        **kwargs
     ):
         super().__init__()
         self.dim = dim
@@ -132,7 +133,7 @@ class ISAB(nn.Module):
         inducing_points = repeat(self.inducing_points, "i e -> b i e", b=b)
 
         out = self.first_MAB(inducing_points, x, attention_mask)  
-        attention_mask = attention_mask.transpose(-1, -2)
+        attention_mask = attention_mask.transpose(-1, -2) if attention_mask is not None else attention_mask
         out = self.second_MAB(x, out, attention_mask)
 
         return out
@@ -149,7 +150,8 @@ class PMA(nn.Module):
         ff_dropout=0.0, 
         ff_dim_scale=4, 
         pre_norm=False, 
-        head_dim=None
+        head_dim=None,
+        **kwargs
     ):
         super().__init__()
         self.dim = dim
@@ -192,12 +194,8 @@ class SetTransformerEncoder(nn.Module):
 
         assert issubclass(internal_block, (SAB, ISAB)), f"[{self.__class__.__name__}] `internal_block` must be either `SAB` or `ISAB`."
 
-        self.first_block = internal_block(
-            **kwargs
-        )
-        self.second_block = internal_block(
-            **kwargs
-        )
+        self.first_block = internal_block(**kwargs)
+        self.second_block = internal_block(**kwargs)
     
     def forward(self, x, attention_mask):
         return self.second_block(self.first_block(x, attention_mask), attention_mask)
@@ -205,7 +203,7 @@ class SetTransformerEncoder(nn.Module):
 
 class SetTransformerDecoder(nn.Module):
     def __init__(self, **kwargs):
-        super.__init__()
+        super().__init__()
 
         self.PMA = PMA(**kwargs)
         self.SAB = SAB(**kwargs)
@@ -216,8 +214,51 @@ class SetTransformerDecoder(nn.Module):
 
 
 class SetTransformer(nn.Module):
-    def __init__(self):
-        ...
+    def __init__(
+        self, 
+        *, 
+        dim, 
+        heads, 
+        encoder_base_block,
+        num_inducing_points, 
+        num_seeds, 
+        attention_dropout=0.0, 
+        ff_dropout=0.0, 
+        ff_dim_scale=4, 
+        pre_norm=False, 
+        head_dim=None
+    ):
+        super().__init__()
     
-    def forward(self, x, attention_mask):
-        ...
+        self.encoder = SetTransformerEncoder(
+            dim=dim, 
+            heads=heads, 
+            internal_block=encoder_base_block,
+            num_inducing_points=num_inducing_points, 
+            attention_dropout=attention_dropout, 
+            ff_dropout=ff_dropout, 
+            ff_dim_scale=ff_dim_scale, 
+            pre_norm=pre_norm, 
+            head_dim=head_dim
+        )
+        self.decoder = SetTransformerDecoder(
+            dim=dim, 
+            heads=heads, 
+            num_seeds=num_seeds, 
+            attention_dropout=attention_dropout, 
+            ff_dropout=ff_dropout, 
+            ff_dim_scale=ff_dim_scale, 
+            pre_norm=pre_norm, 
+            head_dim=head_dim
+        )
+        self.output_head = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.ReLU(),
+            nn.Linear(dim, dim)
+        )
+
+    def forward(self, x, attention_mask=None):
+        x = self.encoder(x, attention_mask=attention_mask)
+        x = self.decoder(x, attention_mask=attention_mask)
+
+        return self.output_head(x)

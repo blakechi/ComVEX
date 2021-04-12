@@ -1,1 +1,1 @@
-from .model import MSA, SAB, ISAB, PMA, SetTransformerEncoder, SetTransformerDecoder, SetTransformer
+from .model import MAB, SAB, ISAB, PMA, SetTransformerEncoder, SetTransformerDecoder, SetTransformer

@@ -63,11 +63,13 @@ class MaskLayerNorm(LayerNorm):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dropout=0.0, useNorm=False, **kwargs):
+    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dim_scale=None, ff_dropout=0.0, useNorm=False, **kwargs):
         super().__init__()
         assert dim is not None, f"[{self.__class__.__name__}] Must specify the input dim"
-        assert hidden_dim is not None, f"[{self.__class__.__name__}] Must specify the hidden dim"
+        if hidden_dim is None:
+            assert ff_dim_scale is not None, f"[{self.__class__.__name__}] Must specify `ff_dim_scale` when `hidden_dim` doesn't exist"
 
+        hidden_dim = hidden_dim if hidden_dim is not None else ff_dim_scale*dim
         out_dim = output_dim if output_dim is not None else dim
 
         if useNorm:
