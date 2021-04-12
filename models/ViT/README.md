@@ -2,6 +2,11 @@
 
 This is an PyTorch implementation of [AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE](https://arxiv.org/abs/2010.11929) referenced from [lucidrains](https://github.com/blakechi/vit-pytorch). For the official implementation, check out this [repo](https://github.com/google-research/vision_transformer).
 
+## Objects
+
+1. `ViTBase`
+2. `ViT`
+
 ## Usage
 
 ```python
@@ -27,7 +32,7 @@ vit = ViT(
 ## Demo
 
 ```bash
-python examples/ViT/ViT.py
+python examples/ViT/demo.py
 ```
 
 ## Citation
