@@ -133,7 +133,7 @@ class ISAB(nn.Module):
         inducing_points = repeat(self.inducing_points, "i e -> b i e", b=b)
 
         out = self.first_MAB(inducing_points, x, attention_mask)  
-        attention_mask = attention_mask.transpose(-1, -2) if attention_mask is not None else attention_mask
+        attention_mask = attention_mask.transpose(-1, -2) if attention_mask is not None else None
         out = self.second_MAB(x, out, attention_mask)
 
         return out
