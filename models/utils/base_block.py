@@ -9,19 +9,31 @@ class Residual(nn.Module):
         self._fn = fn
 
     def forward(self, x, *args, **kwargs):
-        return self._fn(x, *args, **kwargs) + x
+        if isinstance(x, tuple) or isinstance(x, list):
+            return self._fn(x, *args, **kwargs) + x[0]
+        else:
+            return self._fn(x, *args, **kwargs) + x
 
-
+# TODO: Refine it!!
 class LayerNorm(nn.Module):
-    def __init__(self, fn=None, *, dim=None, use_pre_norm=False):
+    def __init__(self, fn=None, *, dim=None, use_pre_norm=False, use_cross_attention=False, cross_dim=None):
         super(LayerNorm, self).__init__()
         self._fn = fn
-        self._norm = nn.LayerNorm(dim)
         self._use_pre_norm = use_pre_norm
+        self._use_cross_attention = use_cross_attention
+        if self._fn:
+            self._norm = nn.LayerNorm(dim)
+            if self._use_pre_norm and use_cross_attention:
+                assert cross_dim is not None, f"[{self.__class__.__name__}] Please specify `cross_dim` when using cross attention"
+                self._cross_norm_k = nn.LayerNorm(cross_dim)
+                self._cross_norm_v = nn.LayerNorm(cross_dim)
 
     def forward(self, x, *args, **kwargs):
         if self._fn:
             if self._use_pre_norm:
+                if self._use_cross_attention:
+                    x = self._norm(x[0]), self._cross_norm_k(x[1]), self._cross_norm_v(x[2])
+                    return self._fn(x, *args, **kwargs)
                 return self._fn(self._norm(x), *args, **kwargs)
             else:
                 return self._norm(self._fn(x, *args, **kwargs))
@@ -51,7 +63,7 @@ class MaskLayerNorm(LayerNorm):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dropout=0.0, useNorm=False):
+    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dropout=0.0, useNorm=False, **kwargs):
         super().__init__()
         assert dim is not None, f"[{self.__class__.__name__}] Must specify the input dim"
         assert hidden_dim is not None, f"[{self.__class__.__name__}] Must specify the hidden dim"

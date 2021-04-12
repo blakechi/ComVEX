@@ -7,13 +7,13 @@ from models.utils import Residual, LayerNorm, FeedForward, MultiheadAttention
 
 
 class TransformerEncoderLayer(nn.Module):
-    def __init__(self, *, dim, heads, pre_norm=False, head_dim=None, ff_dim=None, ff_dropout=0.0):
+    def __init__(self, *, dim, heads, pre_norm=False, head_dim=None, ff_dim=None, ff_dropout=0.0, **kwargs):
         super().__init__()
 
         self.attention_block = LayerNorm(
             Residual(
                 MultiheadAttention(
-                    dim=dim, heads=heads, head_dim=head_dim
+                    dim=dim, heads=heads, head_dim=head_dim, **kwargs
                 )
             ),
             dim=dim,
