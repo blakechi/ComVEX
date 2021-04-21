@@ -149,9 +149,9 @@ class Perceiver(nn.Module):
 
         normalized_grid = [torch.linspace(start=-1, end=1, steps=ax, device=device, dtype=dtype) for ax in axis]
         coordinate = torch.stack(torch.meshgrid(*normalized_grid), dim=-1)
-        coordinate = coordinate.unsqueeze(dim=-1)
+        coordinate = coordinate.unsqueeze(dim=-1)  # To broadcast to num_bands when multiplying with freq at Line 156
 
-        freq = torch.logspace(start=1, end=(log(max_resolution)/log(frequency_base)), steps=num_bands, base=frequency_base, device=device)
+        freq = torch.logspace(start=1, end=(log(max_resolution)/log(frequency_base)), steps=num_bands, base=frequency_base, dtype=dtype, device=device)
         freq = freq[[None for _ in range(len(coordinate.shape) - 1)] + [...]]  # Expand dimensions to (1, ..., 1, num_bands)
         freq = freq*pi*coordinate
         fourier_features = torch.cat([freq.sin(), freq.cos()], dim=-1)

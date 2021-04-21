@@ -1,6 +1,6 @@
 # Perceiver
 
-This is an implementation of the paper [Perceiver: General Perception with Iterative Attention](https://arxiv.org/abs/2103.03206) with slightly modifications. Adapt the method for Fourier feature positional encodings from [lucidrains](https://github.com/lucidrains/perceiver-pytorch)
+This is an implementation of the paper [Perceiver: General Perception with Iterative Attention](https://arxiv.org/abs/2103.03206) with slightly modifications. Adapt the method for Fourier feature positional encodings from [lucidrains](https://github.com/lucidrains/perceiver-pytorch/blob/main/perceiver_pytorch/perceiver_pytorch.py#L31)
 
 ## Objects
 

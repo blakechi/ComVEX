@@ -147,7 +147,6 @@ class PMA(nn.Module):
         heads, 
         num_seeds=1, 
         attention_dropout=0.0, 
-        ff_dropout=0.0, 
         ff_dim_scale=4, 
         pre_norm=False, 
         head_dim=None,
@@ -171,9 +170,9 @@ class PMA(nn.Module):
             heads=self.heads,
             head_dim=head_dim,
             attention_dropout=attention_dropout,
-            ff_dropout=ff_dropout,
             ff_dim_scale=ff_dim_scale,
-            pre_norm=pre_norm
+            pre_norm=pre_norm,
+            **kwargs
         )
         self.ff = FeedForward(
             dim=dim, 
