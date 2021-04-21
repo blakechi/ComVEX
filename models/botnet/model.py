@@ -36,11 +36,11 @@ class BoTMHSA(nn.Module):
         relative_pos = rearrange(self.height_relative_pos + self.width_relative_pos, "h w (p d) -> 1 p (h w) d", p=p)
 
         # Note: scaling doesn't be mention in the original paper
-        qr = einsum("b p n d, 1 p m d -> b p n m", q, relative_pos)*self.scale
-        qk = einsum("b p n d, b p m d -> b p n m", q, k)*self.scale
+        qr = einsum("b p n d, 1 p m d -> b p n m", q, relative_pos)
+        qk = einsum("b p n d, b p m d -> b p n m", q, k)
 
-        attention_weight = (qr + qk).softmax(dim=-1)
-        out = einsum("b p n m, b p n d -> b p n d", attention_weight, v)
+        attention_weight = ((qr + qk)*self.scale).softmax(dim=-1)
+        out = einsum("b p n m, b p m d -> b p n d", attention_weight, v)
         out = rearrange(out, "b p (h w) d -> b (p d) h w")
 
         return out
@@ -49,4 +49,4 @@ class BoTMHSA(nn.Module):
 class BoTBlock(nn.Module):
     def __init__(self, *, in_channel, out_channel, heads, head_dim=None, **kwargs):
         super().__init__()
-    
+
