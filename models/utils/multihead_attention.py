@@ -20,7 +20,7 @@ class MultiheadAttention(nn.Module):
         self.V = nn.Linear(kv_dim if kv_dim is not None else dim, dim, bias=False)
         # Reference from https://huggingface.co/transformers/_modules/transformers/models/bert/modeling_bert.html#BertModel
         self.attention_dropout = nn.Dropout(attention_dropout)
-        self.out_linear = nn.Linear(dim, dim)
+        self.out_linear = nn.Linear(dim, dim, bias=False)
 
         self.scale = self.head_dim ** (-0.5)
         self.mask_value = -torch.finfo(dtype).max  # pytorch default float type
