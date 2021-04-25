@@ -15,7 +15,7 @@ class ResNetBlockBase(nn.Module):
         stride=None,
         padding=None,
         norm_layer=None,
-        remain_dim=False  # False when want to increase the number of channels but remain width and height
+        remain_dim=False  # True when want to increase the number of channels but remain width and height
     ):
         super().__init__()
 
@@ -27,7 +27,7 @@ class ResNetBlockBase(nn.Module):
                 self.stride = 2
 
         self.padding = padding if padding is not None else 1
-        self.norm = norm_layer if norm_layer is not None else nn.BatchNorm2d
+        self.Norm = norm_layer if norm_layer is not None else nn.BatchNorm2d
 
         if remain_dim:
             self.skip = nn.Conv2d(in_channel, out_channel, 1)
@@ -36,8 +36,7 @@ class ResNetBlockBase(nn.Module):
 
 
 class ResNetBlock(ResNetBlockBase):
-    def __init__(
-        self, in_channel, out_channel, **kwargs):
+    def __init__(self, in_channel, out_channel, **kwargs):
         super().__init__(in_channel, out_channel, **kwargs)
 
         self._net = nn.Sequential(
@@ -48,7 +47,7 @@ class ResNetBlock(ResNetBlockBase):
                 self.stride, 
                 self.padding
             ),
-            self.norm(num_features=out_channel),
+            self.Norm(num_features=out_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 out_channel, 
@@ -57,7 +56,7 @@ class ResNetBlock(ResNetBlockBase):
                 1,
                 1
             ),
-            self.norm(num_features=out_channel)
+            self.Norm(num_features=out_channel)
         )
         self.relu = nn.ReLU(inplace=True)  # after addition
 
@@ -75,7 +74,7 @@ class ResNetBottleneckBlock(ResNetBlock):
                 in_channel, 
                 1, 
             ),
-            self.norm(num_features=in_channel),
+            self.Norm(num_features=in_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channel, 
@@ -84,14 +83,14 @@ class ResNetBottleneckBlock(ResNetBlock):
                 self.stride, 
                 self.padding
             ),
-            self.norm(num_features=in_channel),
+            self.Norm(num_features=in_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channel, 
                 out_channel, 
                 1, 
             ),
-            self.norm(num_features=out_channel)
+            self.Norm(num_features=out_channel)
         )
         self.relu = nn.ReLU(inplace=True)  # after addition
 
@@ -102,7 +101,7 @@ class ResNetFullPreActivationBlock(ResNetBlockBase):
         super().__init__(in_channel, out_channel, **kwargs)
 
         self._net = nn.Sequential(
-            self.norm(out_channel),
+            self.Norm(out_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channel,
@@ -111,7 +110,7 @@ class ResNetFullPreActivationBlock(ResNetBlockBase):
                 self.stride,
                 self.padding
             ),
-            self.norm(out_channel),
+            self.Norm(out_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channel,
@@ -131,14 +130,14 @@ class ResNetFullPreActivationBottleneckBlock(ResNetFullPreActivationBlock):
         super().__init__(in_channel, out_channel, **kwargs)
 
         self._net = nn.Sequential(
-            self.norm(in_channel),
+            self.Norm(in_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channel,
                 in_channel,
                 1,
             ),
-            self.norm(in_channel),
+            self.Norm(in_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channel,
@@ -147,7 +146,7 @@ class ResNetFullPreActivationBottleneckBlock(ResNetFullPreActivationBlock):
                 self.stride,
                 self.padding
             ),
-            self.norm(in_channel),
+            self.Norm(in_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
                 in_channel,
@@ -155,14 +154,3 @@ class ResNetFullPreActivationBottleneckBlock(ResNetFullPreActivationBlock):
                 1,
             ),
         )
-
-
-if __name__ == "__main__":
-    # b = ResNetBlock(10, 10, stride=2, padding=1)
-    # b = ResNetBottleneckBlock(10, 10, stride=2, padding=1)
-    # b = ResNetFullPreActivationBlock(10, 10, stride=2, padding=1)
-    b = ResNetFullPreActivationBottleneckBlock(3, 10)
-
-    a = torch.rand(1, 3, 32, 32)
-
-    print(b(a).size())
