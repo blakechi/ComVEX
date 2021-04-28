@@ -104,10 +104,10 @@ class UNetBase(nn.Module):
 class UNet(UNetBase):
     """
     Architecture:
-     encoder               decoder --> output_layer
-        |                     ^ 
-        |                     |
-          ->  middle_layer --
+        encoder               decoder --> output_layer
+           |                     ^ 
+           |                     |
+             ->  middle_layer --
     """
     def __init__(
         self,

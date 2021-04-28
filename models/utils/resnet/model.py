@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 from functools import partial
 from collections import OrderedDict
 
@@ -133,7 +133,7 @@ class ResNetFullPreActivationBlock(ResNetBlockBase):
             self.Norm(out_channel),
             ReLU(),
             nn.Conv2d(
-                in_channel,
+                out_channel,
                 out_channel,
                 3,
                 1,
@@ -181,7 +181,7 @@ class ResNetFullPreActivationBottleneckBlock(ResNetBlockBase):
 
 
 class ResNetBackBone(nn.Module):
-    def __init__(self, config: ResNetConfig = None) -> None:
+    def __init__(self, config: Optional[ResNetConfig] = None) -> None:
         super().__init__()
 
         assert config is not None, f"[{self.__class__.__name__}] Please provide a configuration using `ResNetConfig`"

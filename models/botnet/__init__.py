@@ -1,1 +1,2 @@
-from .model import BoTNetMHSA, BoTNetBlock, BoTNetBlockFullPreActivation, BoTNet 
+from .model import BoTNetMHSA, BoTNetBlock, BoTNetFullPreActivationBlock, BoTNetBackBone, BoTNetWithLinearClassifier
+from .config import BoTNetConfig

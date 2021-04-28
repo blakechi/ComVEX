@@ -7,6 +7,7 @@ class ResNetConfig(object):
         num_input_channel: int,
         base_block_name: str, 
         num_blocks_in_conv_layer: list, 
+        *,
         num_classes: Optional[int] = None,
     ) -> None:
 
@@ -60,5 +61,5 @@ class ResNetConfig(object):
             3,
             "ResNetFullPreActivationBottleneckBlock",
             [3, 4, 6, 3],
-            1000
+            num_classes=1000
         )
