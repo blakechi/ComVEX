@@ -65,7 +65,7 @@ class TransUNet(UNetBase):
             **kwargs
         )
         self.middle_layer = Rearrange("b (p q) d -> b d p q", p=vit_output_size)
-        self.decoder = UNetDecoder(middle_channel, self.channel_in_between[::-1], usebilinearUpsampling=True)
+        self.decoder = UNetDecoder(middle_channel, self.channel_in_between[::-1], use_bilinear_upsampling=True)
         self.output_layer = nn.Conv2d(self.channel_in_between[0], output_channel, kernel_size=1)  # kernel_size == 3 in the offical code
 
     def forward(self, x):

@@ -4,18 +4,14 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.botnet import BoTNetBlock, BoTNetBlockFullPreActivation
 from models.utils import ResNetWithLinearClassifier, ResNetConfig
 
-if __name__ == "__main__":
-    resnet_50_config = ResNetConfig.ResNet_50()
 
+if __name__ == "__main__":
+
+    resnet_50_config = ResNetConfig.ResNet_50_ImageNet()
     resnet_50 = ResNetWithLinearClassifier(resnet_50_config)
     print(resnet_50)
-
-    # botblock = BoTNetBlockFullPreActivation(32, 64, lateral_size=32, heads=4, stride=1, remain_dim=True)
-
-    # print(botblock)
 
     x = torch.randn(1, 3, 1024, 1024)
 

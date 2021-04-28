@@ -59,7 +59,7 @@ class UNetEncoder(nn.Module):
 
 
 class UNetDecoder(nn.Module):
-    def __init__(self, middle_channel=1024, channel_in_between=[], usebilinearUpsampling=False):
+    def __init__(self, middle_channel=1024, channel_in_between=[], use_bilinear_upsampling=False):
         super().__init__()
 
         assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
@@ -68,7 +68,7 @@ class UNetDecoder(nn.Module):
         self.layers = nn.ModuleList([
             nn.ModuleList([
                 UNetConvBlock(channel_in_between[idx], channel_in_between[idx + 1]),
-                nn.ConvTranspose2d(channel_in_between[idx], channel_in_between[idx + 1], kernel_size=2, stride=2) if not usebilinearUpsampling else UNetBilinearUpsamplingBlock(channel_in_between[idx], channel_in_between[idx + 1])
+                nn.ConvTranspose2d(channel_in_between[idx], channel_in_between[idx + 1], kernel_size=2, stride=2) if not use_bilinear_upsampling else UNetBilinearUpsamplingBlock(channel_in_between[idx], channel_in_between[idx + 1])
             ]) 
             for idx in range(len(channel_in_between) - 1)
         ])

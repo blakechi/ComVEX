@@ -25,7 +25,7 @@ class BoTNetMHSA(nn.Module):
         nn.init.kaiming_uniform_(self.width_relative_pos)
 
     def forward(self, x):
-        b, e, h, w, p, device = *x.shape, self.heads, x.device
+        b, c, h, w, p, device = *x.shape, self.heads, x.device
 
         q, k, v = self.QKV(x).chunk(chunks=3, dim=-3)
         q, k, v = map(lambda t: rearrange(t, "b (p d) h w -> b p (h w) d", p=p), (q, k, v))
@@ -55,7 +55,7 @@ class BoTNetBlock(ResNetBlockBase):
     ):
         super().__init__(in_channel, out_channel, **kwargs)
 
-        _net = [
+        _layers = [
             nn.Conv2d(
                 in_channel, 
                 in_channel, 
@@ -78,28 +78,32 @@ class BoTNetBlock(ResNetBlockBase):
             ),
             self.Norm(num_features=out_channel),
         ]
-        if 'stride' in kwargs: _net.insert(-4, nn.AvgPool2d(kernel_size=2, stride=2))
+        if 'stride' in kwargs:  # If stride, add average pooling after BoTNetMHSA
+            _layers.insert(*[(idx + 1) for idx, layer in enumerate(_layers) if isinstance(layer, BoTNetMHSA)], nn.AvgPool2d(kernel_size=2, stride=2))
 
-        self._net = nn.Sequential(*_net)
+        self.net = nn.Sequential(*_layers)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
-        return self.relu(self._net(x) + self.skip(x))
+        return self.relu(self.net(x) + self.skip(x))
 
 
-class BoTNetBlockFullPreActivation(ResNetBlockBase):
+class BoTNetFullPreActivationBlock(ResNetBlockBase):
     def __init__(
-        self, 
-        in_channel, 
-        out_channel, 
-        *, 
-        lateral_size,
-        heads, 
-        **kwargs
+            self, 
+            in_channel, 
+            base_channel, 
+            expand_channel, 
+            *,
+            lateral_size, 
+            heads, 
+            expand_scale=4, 
+            **kwargs
     ):
-        super().__init__(in_channel, out_channel, **kwargs)
+        expand_channel = expand_channel if expand_channel is not None else expand_scale*base_channel
+        super().__init__(in_channel, expand_channel, **kwargs)
 
-        _net = [
+        _layers = [
             self.Norm(num_features=in_channel),
             nn.ReLU(inplace=True),
             nn.Conv2d(
@@ -123,14 +127,16 @@ class BoTNetBlockFullPreActivation(ResNetBlockBase):
                 1
             ),
         ]
-        if 'stride' in kwargs: _net.insert(-3, nn.AvgPool2d(kernel_size=2, stride=2))
+        if 'stride' in kwargs:  # If stride, add average pooling after BoTNetMHSA
+            _layers.insert(*[(idx + 1) for idx, layer in enumerate(_layers) if isinstance(layer, BoTNetMHSA)], nn.AvgPool2d(kernel_size=2, stride=2))
 
-        self._net = nn.Sequential(*_net)
+        self.net = nn.Sequential(*_layers)
 
     def forward(self, x):
-        return self._net(x) + self.skip(x)
+        return self.net(x) + self.skip(x)
 
 
 class BoTNet(nn.Module):
-    def __init__(self, ):
+    def __init__(self):
         super().__init__()
+        ...
