@@ -7,10 +7,10 @@ class BoTNetConfig(ResNetConfig):
     def __init__(
         self, 
         num_input_channel: int,
+        input_lateral_size: int,
         conv_base_block_name: str,
         bot_base_block_name: str,
         num_blocks_in_layer: list, 
-        input_lateral_size: int,
         *,
         num_heads: int = 4,
         bot_block_indicator: list = [1, 1, 1],
@@ -20,6 +20,9 @@ class BoTNetConfig(ResNetConfig):
         assert num_input_channel > 0, self._decorate_message(
              "`num_input_channel` should be specified and greater than 0"
         )
+        assert input_lateral_size > 0, self._decorate_message(
+             "`input_lateral_size` must be greater than 0"
+        )
         assert conv_base_block_name in BoTNetConfig.available_conv_base_blocks(), self._decorate_message(
             f"`conv_base_block_name` ({conv_base_block_name}) should be one as listed below: \n{BoTNetConfig.available_conv_base_blocks()}"
         )
@@ -28,9 +31,6 @@ class BoTNetConfig(ResNetConfig):
         )
         assert len(num_blocks_in_layer) == 4, self._decorate_message(
              "The length of `num_blocks_in_layer` must be qual to 4 for conv_2 to conv_4 plus one BoT layer"
-        )
-        assert input_lateral_size > 0, self._decorate_message(
-             "`input_lateral_size` must be greater than 0"
         )
         assert num_heads > 0, self._decorate_message(
              "`num_heads` must be greater than 0"
@@ -45,6 +45,7 @@ class BoTNetConfig(ResNetConfig):
             )
 
         self.num_input_channel = num_input_channel
+        self.input_lateral_size = input_lateral_size
         self.conv_base_block_name = conv_base_block_name
         self.bot_base_block_name = bot_base_block_name
 
@@ -52,7 +53,6 @@ class BoTNetConfig(ResNetConfig):
         layer_keys = [f"conv_{idx}" for idx in range(2, 4 + 1)] + ["bot"]
         self.num_blocks_in_layer = dict(zip(layer_keys, num_blocks_in_layer))
 
-        self.input_lateral_size = input_lateral_size
         self.num_heads = num_heads
         self.bot_block_indicator = bot_block_indicator
         self.num_classes = num_classes
@@ -77,19 +77,19 @@ class BoTNetConfig(ResNetConfig):
     def BoTNet_50(cls):
         return cls(
             3,
+            1024,
             "ResNetFullPreActivationBottleneckBlock",
             "BoTNetFullPreActivationBlock",
             [3, 4, 6, 3],
-            1024
         )
 
     @classmethod
     def BoTNet_50_ImageNet(cls):
         return cls(
             3,
+            1024,
             "ResNetFullPreActivationBottleneckBlock",
             "BoTNetFullPreActivationBlock",
             [3, 4, 6, 3],
-            1024,
             num_classes=1000
         )
