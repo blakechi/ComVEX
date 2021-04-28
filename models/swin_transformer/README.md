@@ -1,6 +1,6 @@
 # Swin Transformer
 
-This is an PyTorch implementation of [Swin Transformer: Hierarchical Vision Transformer using Shifted Windows](https://arxiv.org/abs/2103.14030). For the official implementation, check out this [repo](https://github.com/microsoft/Swin-Transformer).
+This is an PyTorch implementation of [Swin Transformer: Hierarchical Vision Transformer using Shifted Windows](https://arxiv.org/abs/2103.14030). For the official implementation, check out this [repo](https://github.com/microsoft/Swin-Transformer). Under construction.
 
 ## Objects
 
