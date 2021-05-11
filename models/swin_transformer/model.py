@@ -29,21 +29,19 @@ class WindowAttentionBase(nn.Module):
         self.scale = self.head_dim ** (-0.5)
         self.mask_value = -torch.finfo(dtype).max  # pytorch default float type
 
-    @staticmethod
-    def split_into_windows(x, window_size):
-        x = rearrange(x, "b (p h) (q w) c -> b h w p q c", p=window_size, q=window_size)
+    def split_into_windows(self, x):
+        x = rearrange(x, "b (p h) (q w) c -> b h w p q c", p=self.window_size, q=self.window_size)
         x = rearrange(x, "b h w (p q) c -> b h w n c")
 
         return x
 
-    @staticmethod
-    def merge_windows(x, window_size):
-        x = rearrange(x, "b h w (p q) c -> b h w p q c", p=window_size)
+    def merge_windows(self, x):
+        x = rearrange(x, "b h w (p q) c -> b h w p q c", p=self.window_size)
         x = rearrange(x, "b h w p q c -> b (p h) (q w) c")
 
         return x
 
-    def _get_relative_position_index(self, window_size: Optional[Tuple] = None) -> torch.Tensor:
+    def get_relative_position_index(self) -> torch.Tensor:
         r"""
         Reference from: https://github.com/microsoft/Swin-Transformer/blob/main/models/swin_transformer.py
 
@@ -55,20 +53,15 @@ class WindowAttentionBase(nn.Module):
         >> out = out.view(-1)
         """
 
-        if window_size is not None:
-            assert isinstance(window_size, tuple), f"[{self.__class__.__name__}] `window_size` must be a tuple."
-        else: 
-            window_size = self.window_size
-
-        coords_h = torch.arange(window_size[0])
-        coords_w = torch.arange(window_size[1])
+        coords_h = torch.arange(self.window_size[0])
+        coords_w = torch.arange(self.window_size[1])
         coords = torch.stack(torch.meshgrid([coords_h, coords_w]))
         coords_flatten = torch.flatten(coords, 1)
         relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]
         relative_coords = relative_coords.permute(1, 2, 0).contiguous()
-        relative_coords[:, :, 0] += window_size[0] - 1
-        relative_coords[:, :, 1] += window_size[1] - 1
-        relative_coords[:, :, 0] *= 2 * window_size[1] - 1
+        relative_coords[:, :, 0] += self.window_size[0] - 1
+        relative_coords[:, :, 1] += self.window_size[1] - 1
+        relative_coords[:, :, 0] *= 2 * self.window_size[1] - 1
         relative_position_index = relative_coords.sum(-1)
 
         return rearrange(relative_position_index, "... -> (...)")
@@ -95,7 +88,7 @@ class WindowAttention(WindowAttentionBase):
     def _forward(self, x, attention_mask=None):
         b, H, W, c, g, p = *x.shape, self.heads, self.window_size
 
-        x = self.split_into_windows(x, p)
+        x = self.split_into_windows(x)
 
         q, k, v = self.qkv(x).chunk(chunks=3, dim=-1)
         q, k, v = map(lambda t: rearrange(t, "b h w n (g d) -> b g h w n d", g=g), (q, k, v))
@@ -115,7 +108,7 @@ class WindowAttention(WindowAttentionBase):
 
         out = einsum("b g h w n m, b g h w m d -> b g h w n d", similarity, v)
         out = rearrange(out, "b g h w n d -> b h w n (g d)")
-        out = self.merge_windows(out, p)
+        out = self.merge_windows(out)
 
         return self.out_linear(out)
 
@@ -156,10 +149,10 @@ class ShiftWindowAttention(WindowAttention):
                 image_mask[:, h, w, :] = cnt
                 cnt += 1
 
-        mask_windows = WindowAttention.split_into_windows(image_mask, self.window_size)  # nW, window_size, window_size, 1
+        mask_windows = self.split_into_windows(image_mask)  # nW, window_size, window_size, 1
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
-        attn_mask = attn_mask != 0
+        apttn_mask = attn_mask != 0
 
         return attn_mask
 
