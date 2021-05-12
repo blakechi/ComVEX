@@ -1,25 +1,44 @@
-from typing import Optional, Tuple
+from collections import OrderedDict
 import torch
 from torch import nn, einsum
 from einops import rearrange, repeat
-from einops.layers.torch import Rearrange
+from einops.layers.torch import Rearrange, Reduce
 
-from models.vit import ViTBase
 from models.utils import Residual, LayerNorm, FeedForward
 
 
+class PatchMerging(nn.Module):
+    def __init__(self, channel):
+        super().__init__()
+
+        self.merge = Rearrange("b (h p) (w q) c -> b h w (p q c)", p=2, q=2)
+        self.proj_head = nn.Sequential(
+            nn.LayerNorm(4*channel),
+            nn.Linear(4*channel, 2*channel, bias=False)
+        )
+
+    def forward(self, x):
+        x = self.merge(x)
+
+        return self.proj_head(x)
+
+
 class WindowAttentionBase(nn.Module):
-    def __init__(self, *, dim, heads, window_size, head_dim=None, dtype=torch.float32):
+    def __init__(self, *, dim, window_size, heads=None, head_dim=None, dtype=torch.float32, **not_used):
         super().__init__()
 
         self.dim = dim
         self.window_size = window_size
-        self.heads = heads
+
+        assert (
+            heads is not None or head_dim is not None
+        ), f"[{self.__class__.__name__}] Please specify `heads` or `head_dim`"
+        self.heads = heads if heads is not None else dim // head_dim
         self.head_dim = head_dim if head_dim is not None else dim // heads
 
         assert (
             self.head_dim * self.heads == self.dim
-        ), "Head dimension times the number of heads must be equal to embedding dimension"
+        ), f"[{self.__class__.__name__}] Head dimension times the number of heads must be equal to embedding dimension. ({self.head_dim}*{self.heads} != {self.dim})"
 
         self.relative_position = nn.Parameter(
             torch.empty([self.heads, (2*self.window_size[0] - 1)*(2*self.window_size[1] - 1)], requires_grad=True)
@@ -30,18 +49,16 @@ class WindowAttentionBase(nn.Module):
         self.mask_value = -torch.finfo(dtype).max  # pytorch default float type
 
     def split_into_windows(self, x):
-        x = rearrange(x, "b (p h) (q w) c -> b h w p q c", p=self.window_size, q=self.window_size)
-        x = rearrange(x, "b h w (p q) c -> b h w n c")
+        x = rearrange(x, "b (p h) (q w) c -> b h w (p q) c", p=self.window_size[0], q=self.window_size[1])
 
         return x
 
     def merge_windows(self, x):
-        x = rearrange(x, "b h w (p q) c -> b h w p q c", p=self.window_size)
-        x = rearrange(x, "b h w p q c -> b (p h) (q w) c")
+        x = rearrange(x, "b h w (p q) c -> b (p h) (q w) c", p=self.window_size[0], q=self.window_size[1])
 
         return x
 
-    def get_relative_position_index(self) -> torch.Tensor:
+    def _get_relative_position_index(self) -> torch.Tensor:
         r"""
         Reference from: https://github.com/microsoft/Swin-Transformer/blob/main/models/swin_transformer.py
 
@@ -73,8 +90,8 @@ class WindowAttentionBase(nn.Module):
 
 
 class WindowAttention(WindowAttentionBase):
-    def __init__(self, *, dim, heads, window_size, attention_dropout=0.0, head_dim=None, dtype=torch.float32, **kwargs):
-        super().__init__(dim, heads, window_size, head_dim=head_dim, dtype=dtype)
+    def __init__(self, *, dim, window_size, attention_dropout=0.0, **kwargs):
+        super().__init__(dim=dim, window_size=window_size, **kwargs)
 
         self.qkv = nn.Linear(dim, 3*dim)
         self.attention_dropout = nn.Dropout(attention_dropout)
@@ -86,10 +103,9 @@ class WindowAttention(WindowAttentionBase):
         return self._forward(x, attention_mask)
 
     def _forward(self, x, attention_mask=None):
-        b, H, W, c, g, p = *x.shape, self.heads, self.window_size
+        b, H, W, c, g = *x.shape, self.heads
 
         x = self.split_into_windows(x)
-
         q, k, v = self.qkv(x).chunk(chunks=3, dim=-1)
         q, k, v = map(lambda t: rearrange(t, "b h w n (g d) -> b g h w n d", g=g), (q, k, v))
 
@@ -97,7 +113,7 @@ class WindowAttention(WindowAttentionBase):
         similarity = einsum("b g h w n d, b g h w m d -> b g h w n m", q, k)
 
         relative_position_bias = self.relative_position[:, self.relative_position_index]
-        relative_position_bias = rearrange(relative_position_bias, "g (n m) -> 1 g 1 1 n m")
+        relative_position_bias = rearrange(relative_position_bias, "g (n m) -> 1 g 1 1 n m", m=similarity.shape[-1])
         similarity = similarity + relative_position_bias
 
         if attention_mask is not None: 
@@ -114,8 +130,8 @@ class WindowAttention(WindowAttentionBase):
 
 
 class ShiftWindowAttention(WindowAttention):
-    def __init__(self, *, dim, heads, window_size, shifts, input_resolution, **kwargs):
-        super().__init__(dim, heads, window_size, **kwargs)
+    def __init__(self, *, dim, window_size, shifts, input_resolution, **kwargs):
+        super().__init__(dim=dim, window_size=window_size, **kwargs)
 
         self.shifts = shifts
         self.register_buffer("shifted_attention_mask", self._get_shifted_attnetion_mask(input_resolution))
@@ -137,11 +153,11 @@ class ShiftWindowAttention(WindowAttention):
 
         H, W = input_resolution
         image_mask = torch.zeros([1, H, W, 1])
-        h_slices = (slice(0, -self.window_size),
-                    slice(-self.window_size, -self.shifts),
+        h_slices = (slice(0, -self.window_size[0]),
+                    slice(-self.window_size[0], -self.shifts),
                     slice(-self.shifts, None))
-        w_slices = (slice(0, -self.window_size),
-                    slice(-self.window_size, -self.shifts),
+        w_slices = (slice(0, -self.window_size[1]),
+                    slice(-self.window_size[1], -self.shifts),
                     slice(-self.shifts, None))
         cnt = 0
         for h in h_slices:
@@ -149,32 +165,33 @@ class ShiftWindowAttention(WindowAttention):
                 image_mask[:, h, w, :] = cnt
                 cnt += 1
 
-        mask_windows = self.split_into_windows(image_mask)  # nW, window_size, window_size, 1
-        mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
+        mask_windows = self.split_into_windows(image_mask)
+        mask_windows = mask_windows.view(-1, self.window_size[0] * self.window_size[1])
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
-        apttn_mask = attn_mask != 0
+        attn_mask = attn_mask != 0  # (num_windows*num_window, window_size[0]**2, window_size[1]**2)
 
-        return attn_mask
+        return rearrange(attn_mask, "(h w) n m -> 1 1 h w n m", h=int(attn_mask.shape[0]**0.5))
 
 
-class SwinTransformerBlock(nn.Module):
+class SwinTransformerLayer(nn.Module):
     def __init__(
         self, 
         dim, 
         window_size, 
-        heads, 
         shifts=None, 
+        input_resolution=None,
         ff_dim=None, 
         pre_norm=False, 
         **kwargs
     ):
+        super().__init__()
 
         self.attention_block = LayerNorm(
             Residual(
                 ShiftWindowAttention(
-                    dim=dim, heads=heads, window_size=window_size, shifts=shifts, **kwargs
+                    dim=dim, window_size=window_size, shifts=shifts, input_resolution=input_resolution, **kwargs
                 ) if shifts is not None else WindowAttention(
-                    dim=dim, heads=heads, window_size=window_size, **kwargs
+                    dim=dim, window_size=window_size, **kwargs
                 )
             ),
             dim=dim,
@@ -196,19 +213,151 @@ class SwinTransformerBlock(nn.Module):
         return self.ff_block(x)
 
 
-class PatchMerging(nn.Module):
-    def __init__(self, dim):
+class SwinTransformerBlock(nn.Module):
+    def __init__(
+        self, 
+        num_layers,
+        input_channel, 
+        head_dim, 
+        window_size,
+        shifts=None, 
+        input_resolution=None,
+        **kwargs
+    ):
         super().__init__()
 
-        self.merge = Rearrange("b (h p) (w q) c -> b h w (p q)", p=2, q=2)
-        self.proj_head = nn.Sequential(
-            nn.LayerNorm(4*dim),
-            nn.Linear(4*dim, 2*dim, bias=False)
+        self.layers = nn.ModuleList([
+            SwinTransformerLayer(
+                dim=input_channel, 
+                head_dim=head_dim,
+                window_size=window_size, 
+                shifts=None if idx % 2 == 0 else shifts, 
+                input_resolution=None if idx % 2 == 0 else input_resolution, 
+                **kwargs
+            ) for idx in range(num_layers)
+        ])
+
+    def forward(self, x, attention_mask=None):
+        
+        for layer in self.layers:
+            x = layer(x, attention_mask)
+
+        return x
+
+
+class SwinTransformerBase(nn.Module):
+    def __init__(self, image_channel, image_size, patch_size, num_channels, num_layers_in_stages):
+        super().__init__()
+
+        assert image_channel is not None, f"[{self.__class__.__name__}] Please specify the number of input images' channels."
+        assert image_size is not None, f"[{self.__class__.__name__}] Please specify input images' size."
+        assert patch_size is not None, f"[{self.__class__.__name__}] Please specify patches' size."
+        assert len(num_layers_in_stages) == 4, f"[{self.__class__.__name__}] The number of stages should be 4, but got {len(num_layers_in_stages)}"
+        for num_layers in num_layers_in_stages:
+            assert num_layers % 2 == 0, f"[{self.__class__.__name__}] The number of layers in stages should be an even number, but got {num_layers}"
+
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.num_patches = (image_size // patch_size) ** 2
+        self.num_channels = num_channels
+        self.num_channels_after_patching = (patch_size**2) * image_channel
+
+        assert (
+            (self.num_patches**0.5) * patch_size == image_size
+        ), f"[{self.__class__.__name__}] Image size must be divided by the patch size."
+
+        self.flatten_to_patch = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
+
+
+class SwinTransformerBackbone(SwinTransformerBase):
+    def __init__(
+        self, 
+        image_channel, 
+        image_size, 
+        patch_size,
+        num_channels,
+        num_layers_in_stages, 
+        *,
+        head_dim=32,
+        window_size=(7, 7),
+        shifts=2,
+        use_absolute_position=False,
+        token_dropout=0.0,
+        **kwargs
+    ):
+        super().__init__(image_channel, image_size, patch_size, num_channels, num_layers_in_stages)
+
+        self.patch_embedding = nn.Sequential(
+            nn.Linear(self.num_channels_after_patching, self.num_channels)
         )
 
-    def forward(self, x):
-        x = self.merge(x)
+        self.use_absolute_position = use_absolute_position
+        if use_absolute_position:
+            self.absolute_position = nn.Parameter(torch.empty(1, self.num_patches, self.num_channels))
+            nn.init.trunc_normal_(self.absolute_position, std=0.02)
+
+        self.token_dropout = nn.Dropout(token_dropout)
+
+        self.stages = nn.ModuleList([
+            nn.ModuleList(self._build_stage(f"stage_{idx}", num_layers_in_stages[idx], head_dim, window_size, shifts, **kwargs))
+            for idx in range(4)
+        ])
+
+        self.pooler = nn.Sequential(
+            Rearrange("b h w c -> b (h w) c"),
+            nn.LayerNorm(self.num_channels * 2**(3)),
+            Reduce("b n c -> b c", reduction="mean")  # token-wise mean pooling
+        )
+
+    def forward(self, x, attention_mask=None):
+
+        x = self.flatten_to_patch(x)
+        x = self.patch_embedding(x)
+
+        if self.use_absolute_position: 
+            x = x + self.absolute_position
+
+        x = self.token_dropout(x)
+        x = rearrange(x, "b (h w) c -> b h w c", h=int(self.num_patches**0.5))
+
+        for patch_merge, swin_block in self.stages:
+            x = patch_merge(x)
+            x = swin_block(x, attention_mask)
+
+        x = self.pooler(x)
+
+        return x
+
+    def _build_stage(self, name, num_layers, head_dim, window_size, shifts, **kwargs):
+        stage_idx = int(name[-1])
+        input_channel = self.num_channels * 2**(stage_idx)
+        input_resolution = self.image_size // 2**(stage_idx + 2)
+        assert (
+            (input_resolution % window_size[0] == 0) and (input_resolution % window_size[1] == 0)
+        ), f"[{self.__class__.__name__}] Input resolution ({input_resolution}) of Stage {stage_idx} can not be divided by window size {window_size}."
+        input_resolution = (input_resolution, input_resolution)
+
+        block = SwinTransformerBlock(
+            num_layers,
+            input_channel, 
+            head_dim, 
+            window_size,
+            shifts=shifts, 
+            input_resolution=input_resolution,
+            **kwargs
+        )
+
+        return nn.Identity() if stage_idx == 0 else PatchMerging(input_channel//2), block
+
+
+class SwinTransformerWithLinearClassifier(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.swin = SwinTransformerBackbone(config)
+        self.proj_head = nn.LazyLinear(config.num_classes)
+
+    def forward(self, x, attention_mask=None):
+        x = self.swin(x, attention_mask)
 
         return self.proj_head(x)
-
-    
