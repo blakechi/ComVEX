@@ -1,7 +1,7 @@
-from collections import OrderedDict
 import torch
 from torch import nn, einsum
-from einops import rearrange, repeat
+from torch.utils.checkpoint import checkpoint
+from einops import rearrange
 from einops.layers.torch import Rearrange, Reduce
 
 from models.utils import Residual, LayerNorm, FeedForward
@@ -181,7 +181,7 @@ class SwinTransformerLayer(nn.Module):
         shifts=None, 
         input_resolution=None,
         ff_dim=None, 
-        pre_norm=False, 
+        use_pre_norm=False, 
         **kwargs
     ):
         super().__init__()
@@ -195,7 +195,7 @@ class SwinTransformerLayer(nn.Module):
                 )
             ),
             dim=dim,
-            use_pre_norm=pre_norm
+            use_pre_norm=use_pre_norm
         )
         self.ff_block = LayerNorm(
             Residual(
@@ -204,7 +204,7 @@ class SwinTransformerLayer(nn.Module):
                 )
             ),
             dim=dim,
-            use_pre_norm=pre_norm
+            use_pre_norm=use_pre_norm
         )
 
     def forward(self, x, attention_mask):
@@ -222,9 +222,12 @@ class SwinTransformerBlock(nn.Module):
         window_size,
         shifts=None, 
         input_resolution=None,
+        use_checkpoint=False,
         **kwargs
     ):
         super().__init__()
+
+        self.use_checkpoint = use_checkpoint
 
         self.layers = nn.ModuleList([
             SwinTransformerLayer(
@@ -238,9 +241,13 @@ class SwinTransformerBlock(nn.Module):
         ])
 
     def forward(self, x, attention_mask=None):
-        
         for layer in self.layers:
-            x = layer(x, attention_mask)
+            # Reference from: https://github.com/microsoft/Swin-Transformer/blob/a011aad339e0514e538313ee4011b4f3569f70de/models/swin_transformer.py#L391
+            # Note: It's different from Sparse Transformer, but we follow the official code here.
+            if self.use_checkpoint:
+                x = checkpoint(layer, x, attention_mask)
+            else:
+                x = layer(x, attention_mask)
 
         return x
 
@@ -299,8 +306,14 @@ class SwinTransformerBackbone(SwinTransformerBase):
         self.token_dropout = nn.Dropout(token_dropout)
 
         self.stages = nn.ModuleList([
-            nn.ModuleList(self._build_stage(f"stage_{idx}", num_layers_in_stages[idx], head_dim, window_size, shifts, **kwargs))
-            for idx in range(4)
+            nn.ModuleList(self._build_stage(
+                f"stage_{idx}", 
+                num_layers_in_stages[idx], 
+                head_dim, 
+                window_size, 
+                shifts, 
+                **kwargs
+            )) for idx in range(4)
         ])
 
         self.pooler = nn.Sequential(
@@ -354,7 +367,7 @@ class SwinTransformerWithLinearClassifier(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.swin = SwinTransformerBackbone(config)
+        self.swin = SwinTransformerBackbone(**config.__dict__)
         self.proj_head = nn.LazyLinear(config.num_classes)
 
     def forward(self, x, attention_mask=None):

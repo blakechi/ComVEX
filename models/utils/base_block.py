@@ -2,17 +2,18 @@ import torch
 from torch import nn
 
 class Residual(nn.Module):
-    def __init__(self, fn):
+    def __init__(self, fn, skip_connection_dropout=0.0, skip_connection_dropout_module=None):
         super(Residual, self).__init__()
 
         assert fn is not None, f"[{self.__class__.__name__}] Must give it a function (normaly, a neural net)"
         self._fn = fn
+        self.skip_connection_dropout = skip_connection_dropout_module(skip_connection_dropout) if skip_connection_dropout_module is not None else nn.Dropout(skip_connection_dropout)
 
     def forward(self, x, *args, **kwargs):
         if isinstance(x, tuple) or isinstance(x, list):
-            return self._fn(x, *args, **kwargs) + x[0]
+            return self._fn(x, *args, **kwargs) + self.skip_connection_dropout(x[0])  # assume the first element is the main hidden state
         else:
-            return self._fn(x, *args, **kwargs) + x
+            return self._fn(x, *args, **kwargs) + self.skip_connection_dropout(x)
 
 # TODO: Refine it!!
 class LayerNorm(nn.Module):
