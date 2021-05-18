@@ -70,7 +70,7 @@ class FNetWithLinearClassifier(nn.Module):
     def __init__(self, config=None) -> None:
         super().__init__()
 
-        self.token_embedding
+        # self.token_embedding
         self.fnet_backbone = FNetBackbone(**config.__dict__)
         self.classifier = nn.LazyLinear(config.num_classes)
 

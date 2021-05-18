@@ -1,23 +1,25 @@
+from typing import List
+
 class SwinTransformerConfig(object):
     def __init__(
         self, 
         *,
-        image_channel, 
-        image_size, 
-        patch_size,
-        num_channels,
-        num_layers_in_stages, 
-        head_dim,
-        window_size,
-        shifts,
-        num_classes,
-        use_absolute_position,
-        use_checkpoint,
-        use_pre_norm=False, 
-        ff_dim=None, 
-        ff_dropout=0.0,
-        attention_dropout=0.0,
-        token_dropout=0.0,
+        image_channel: int, 
+        image_size: int, 
+        patch_size: int,
+        num_channels: int,
+        num_layers_in_stages: List[int], 
+        head_dim: int,
+        window_size: int,
+        shifts: int,
+        num_classes: int,
+        use_absolute_position: bool,
+        use_checkpoint: bool,
+        use_pre_norm: bool = False, 
+        ff_dim: int = None, 
+        ff_dropout: float = 0.0,
+        attention_dropout: float = 0.0,
+        token_dropout: float = 0.0,
     ) -> None:
 
         self.image_channel =image_channel 
