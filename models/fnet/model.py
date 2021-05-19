@@ -1,8 +1,10 @@
 import torch
-import torch.nn.functional as F
 from torch import nn
+from einops import repeat
 
-from models.utils import Residual, LayerNorm, FeedForward
+from .config import FNetConfig
+from models.vit import ViTBase
+from models.utils import Residual, LayerNorm, FeedForward, ProjectionHead
 
 
 class FNetFourierTransform(nn.Module):
@@ -10,10 +12,7 @@ class FNetFourierTransform(nn.Module):
         super().__init__()
 
     def forward(self, x):
-        x = torch.fft.fft(x, dim=-1)
-        x = torch.fft.fft(x, dim=-2)
-
-        return x.real
+        return torch.fft.fft2(x).real
 
 
 class FNetEncoderLayer(nn.Module):
@@ -49,35 +48,58 @@ class FNetBackbone(nn.Module):
         *, 
         dim, 
         depth, 
+        dense_act_fnc_name="ReLU",
         **kwargs
     ):
         super().__init__()
-        self.dim = dim
-        self.depth = depth
 
         self.layers = nn.Sequential(*[
             FNetEncoderLayer(
-                dim=self.dim,  
+                dim=dim,  
                 **kwargs
             ) for _ in range(depth)
         ])
-                
+        self.dense = nn.Sequential(
+            nn.Linear(dim, dim),
+            getattr(nn, dense_act_fnc_name)(),
+        )
+        
     def forward(self, x):
-        return self.layers(x)
+        x = self.layers(x)
+
+        return self.dense(x)
 
 
-class FNetWithLinearClassifier(nn.Module):
-    def __init__(self, config=None) -> None:
-        super().__init__()
+class FNetWithLinearHead(ViTBase):
+    def __init__(self, config: FNetConfig = None) -> None:
+        super().__init__(config.image_size, config.image_channel, config.patch_size, config.dim, 1)
 
-        # self.token_embedding
+        self.linear_proj = nn.Linear(self.patch_dim, self.dim, bias=False)
+        self.CLS = nn.Parameter(torch.randn(1, 1, self.dim))
+        self.position_code = nn.Parameter(torch.randn(1, self.num_patches + 1, self.dim))  # plus 1 for CLS
+        self.token_dropout = nn.Dropout(config.token_dropout)
+
         self.fnet_backbone = FNetBackbone(**config.__dict__)
-        self.classifier = nn.LazyLinear(config.num_classes)
+
+        self.proj_head = ProjectionHead(
+            self.dim,
+            config.num_classes,
+            config.pred_act_fnc_name,
+        )
 
     def forward(self, x):
+        b, _, _, _ = x.shape  # b, c, h, w = x.shape
+
+        x = self.patch_and_flat(x)
+        x = self.linear_proj(x)
+        x = self.token_dropout(x)
+
+        # Prepend CLS token and add position code
+        CLS = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
+        x = torch.cat([CLS, x], dim=1) + self.position_code
+
         x = self.fnet_backbone(x)
 
-        return self.classifier(x)
-
+        return self.proj_head(x[:, 0, :])
 
 

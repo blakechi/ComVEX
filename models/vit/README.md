@@ -21,7 +21,7 @@ vit = ViT(
     depth=12,
     num_heads=16,
     # Optional arguments
-    pre_norm=True
+    pre_norm=False
     ff_dim=None,                    # If not specify, ff_dim = 4*dim
     ff_dropout=0.0,
     token_dropout=0.0,

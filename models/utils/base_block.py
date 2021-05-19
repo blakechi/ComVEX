@@ -64,7 +64,7 @@ class MaskLayerNorm(LayerNorm):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dim_scale=None, ff_dropout=0.0, useNorm=False, **kwargs):
+    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dim_scale=None, ff_dropout=0.0, act_fnc_name="GELU", useNorm=False, **kwargs):
         super().__init__()
         assert dim is not None, f"[{self.__class__.__name__}] Must specify the input dim"
         if hidden_dim is None:
@@ -82,7 +82,7 @@ class FeedForward(nn.Module):
                     ),
                     dim=dim
                 ),
-                nn.GELU(),
+                getattr(nn, act_fnc_name)(),
                 LayerNorm(
                     nn.Linear(hidden_dim, out_dim),
                     dim=hidden_dim
@@ -91,10 +91,26 @@ class FeedForward(nn.Module):
         else:
             self._net = nn.Sequential(
                 nn.Linear(dim, hidden_dim),
-                nn.GELU(),
+                getattr(nn, act_fnc_name)(),
                 nn.Dropout(ff_dropout),
                 nn.Linear(hidden_dim, out_dim),
             )
 
     def forward(self, x):
         return self._net(x)
+
+
+# Reference from: https://github.com/huggingface/transformers/blob/master/src/transformers/models/bert/modeling_bert.py#L642
+class ProjectionHead(nn.Module):
+    def __init__(self, dim, out_dim, act_fnc_name="ReLU"):
+        super().__init__()
+
+        self.head = nn.Sequential(  
+            nn.Linear(dim, dim),
+            getattr(nn, act_fnc_name)(),
+            nn.LayerNorm(dim),
+            nn.Linear(dim, out_dim),
+        )
+
+    def forward(self, x):
+        return self.head(x)

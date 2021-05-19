@@ -273,7 +273,7 @@ class SwinTransformerBase(nn.Module):
             (self.num_patches**0.5) * patch_size == image_size
         ), f"[{self.__class__.__name__}] Image size must be divided by the patch size."
 
-        self.flatten_to_patch = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
+        self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
 
 
 class SwinTransformerBackbone(SwinTransformerBase):
@@ -324,7 +324,7 @@ class SwinTransformerBackbone(SwinTransformerBase):
 
     def forward(self, x, attention_mask=None):
 
-        x = self.flatten_to_patch(x)
+        x = self.patch_and_flat(x)
         x = self.patch_embedding(x)
 
         if self.use_absolute_position: 

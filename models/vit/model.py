@@ -29,7 +29,7 @@ class ViTBase(nn.Module):
             (self.num_patches**0.5) * patch_size == image_size
         ), f"[{self.__class__.__name__}] Image size must be divided by the patch size."
 
-        self.flatten_to_patch = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
+        self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
 
 
 class ViT(ViTBase):
@@ -43,7 +43,7 @@ class ViT(ViTBase):
         dim,         # tokens' dimension
         num_heads,
         depth,
-        pre_norm=True,
+        pre_norm=False,
         ff_dim=None,                    # If not specify, ff_dim = 4*dim
         ff_dropout=0.0,
         token_dropout=0.0,
@@ -64,9 +64,9 @@ class ViT(ViTBase):
                 depth=depth,
                 heads=self.num_heads,
                 head_dim=self.head_dim,
-                pre_norm=True,
-                ff_dim=None,
-                ff_dropout=0.0,
+                pre_norm=pre_norm,
+                ff_dim=ff_dim,
+                ff_dropout=ff_dropout,
             )
         )
 
@@ -80,7 +80,7 @@ class ViT(ViTBase):
         b, c, h, w, p = *x.shape, self.num_patches
 
         # Divide into flattened patches
-        x = self.flatten_to_patch(x)
+        x = self.patch_and_flat(x)
 
         # Linear projection
         x = self.linear_proj(x)

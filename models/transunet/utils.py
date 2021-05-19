@@ -64,7 +64,7 @@ class TransUNetViT(ViTBase):
         b, c, h, w, p = *x.shape, self.num_patches
 
         # Images patching and projection
-        x = self.flatten_to_patch(x)
+        x = self.patch_and_flat(x)
         x = self.proj_patches(x)
 
         # Add position code
