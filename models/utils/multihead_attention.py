@@ -31,6 +31,7 @@ class MultiheadAttention(nn.Module):
             x (b, n, d) or ((b, n, d), (b, n, d), (b, n, d)): input tensors, if its a list, the order represents (q, k, v)
             attention_mask (b n m): Use True or 1 to mask out attention weights and False or 0 for opposite.
         """
+        
         if isinstance(x, tuple):
             b, n, d, h = *x[0].shape, self.heads
             q, k, v = map(lambda proj_token_pair: proj_token_pair[0](proj_token_pair[1]), zip((self.Q, self.K, self.V), x))

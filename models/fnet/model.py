@@ -72,17 +72,17 @@ class FNetBackbone(nn.Module):
 
 class FNetWithLinearHead(ViTBase):
     def __init__(self, config: FNetConfig = None) -> None:
-        super().__init__(config.image_size, config.image_channel, config.patch_size, config.dim, 1)
+        super().__init__(config.image_size, config.image_channel, config.patch_size)
 
-        self.linear_proj = nn.Linear(self.patch_dim, self.dim, bias=False)
-        self.CLS = nn.Parameter(torch.randn(1, 1, self.dim))
-        self.position_code = nn.Parameter(torch.randn(1, self.num_patches + 1, self.dim))  # plus 1 for CLS
+        self.linear_proj = nn.Linear(self.patch_dim, config.dim, bias=False)
+        self.CLS = nn.Parameter(torch.randn(1, 1, config.dim))
+        self.position_code = nn.Parameter(torch.randn(1, self.num_patches + 1, config.dim))  # plus 1 for CLS
         self.token_dropout = nn.Dropout(config.token_dropout)
 
         self.fnet_backbone = FNetBackbone(**config.__dict__)
 
         self.proj_head = ProjectionHead(
-            self.dim,
+            config.dim,
             config.num_classes,
             config.pred_act_fnc_name,
         )

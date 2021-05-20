@@ -1,7 +1,5 @@
-import torch
-import torch.nn.functional as F
-from torch import nn, einsum
-from einops import rearrange, repeat
+from torch import nn
+from einops import repeat
 
 from models.utils import Residual, LayerNorm, FeedForward, MultiheadAttention
 
@@ -64,8 +62,8 @@ class Transformer(nn.Module):
         return repeat(padding_mask[:, :, None] + padding_mask[:, None, :], "b n m -> b h n m", h=h)
         
     def forward(self, x, attention_mask=None, padding_mask=None):
-        if attention_mask is None and padding_mask is not None:
-            attention_mask = make_attention_mask(padding_mask)
+        if padding_mask is not None:
+            attention_mask |= self.make_attention_mask(padding_mask)
 
         for layer in self.layers:
             x = layer(x, attention_mask)

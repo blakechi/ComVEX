@@ -37,15 +37,15 @@ class TransUNetViT(ViTBase):
         ff_dim=None,
         self_defined_transformer=None,
         ):
-        super().__init__(image_size, image_channel, patch_size, dim, num_heads)
+        super().__init__(image_size, image_channel, patch_size)
 
-        self.proj_patches = nn.Linear(self.patch_dim, self.dim, bias=False)
+        self.proj_patches = nn.Linear(self.patch_dim, dim, bias=False)
 
         # According to line 149: https://github.com/Beckschen/TransUNet/blob/main/networks/vit_seg_modeling.py#L149
-        self.position_code = nn.Parameter(torch.zeros(1, self.num_patches, self.dim))
+        self.position_code = nn.Parameter(torch.zeros(1, self.num_patches, dim))
         self.token_dropout = nn.Dropout(token_dropout)
 
-        ff_dim = ff_dim if ff_dim is not None else 4*self.dim
+        ff_dim = ff_dim if ff_dim is not None else 4*dim
 
         self.transformer = (
             self_defined_transformer
@@ -60,7 +60,7 @@ class TransUNetViT(ViTBase):
             )
         )
 
-    def forward(self, x, att_mask=None, padding_mask=None):
+    def forward(self, x, attention_mask=None, padding_mask=None):
         b, c, h, w, p = *x.shape, self.num_patches
 
         # Images patching and projection
@@ -74,6 +74,6 @@ class TransUNetViT(ViTBase):
         x = self.token_dropout(x)
         
         # Transformer
-        x = self.transformer(x)
+        x = self.transformer(x, attention_mask, padding_mask)
         
         return x
