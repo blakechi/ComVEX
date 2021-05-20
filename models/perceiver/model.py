@@ -35,7 +35,7 @@ class PerceiverBlock(nn.Module):
                 use_pre_norm=pre_norm,
                 use_cross_attention=True,
                 fn=Residual(
-                    fn=MultiheadAttention(dim=dim, kv_dim=cross_kv_dim, heads=cross_heads, **kwargs)
+                    fn=MultiheadAttention(dim, kv_dim=cross_kv_dim, heads=cross_heads, **kwargs)
                 )
             ),
             LayerNorm(
@@ -53,7 +53,7 @@ class PerceiverBlock(nn.Module):
                     dim=dim,
                     use_pre_norm=pre_norm,
                     fn=Residual(
-                        fn=MultiheadAttention(dim=dim, heads=heads, **kwargs)
+                        fn=MultiheadAttention(dim, heads, **kwargs)
                     )
                 ),
                 LayerNorm(

@@ -11,7 +11,7 @@ class TransformerEncoderLayer(nn.Module):
         self.attention_block = LayerNorm(
             Residual(
                 MultiheadAttention(
-                    dim=dim, heads=heads, head_dim=head_dim, **kwargs
+                    dim, heads, head_dim=head_dim, **kwargs
                 )
             ),
             dim=dim,

@@ -4,25 +4,37 @@ from einops import rearrange, repeat
 
 
 class MultiheadAttention(nn.Module):
-    def __init__(self, *, dim, heads, attention_dropout=0.0, kv_dim=None, head_dim=None, dtype=torch.float32, **kwargs):
+    def __init__(
+        self, 
+        in_dim, 
+        heads, 
+        *,
+        kv_dim=None, 
+        head_dim=None, 
+        proj_dim=None, 
+        attention_dropout=0.0, 
+        dtype=torch.float32, 
+        **rest
+    ):
         super().__init__()
 
-        self.dim = dim
         self.heads = heads
-        self.head_dim = head_dim if head_dim is not None else dim // heads
+        dim = proj_dim if proj_dim is not None else in_dim
+        head_dim = head_dim if head_dim is not None else dim // heads
 
         assert (
-            self.head_dim * self.heads == self.dim
-        ), "Head dimension times the number of heads must be equal to embedding dimension"
+            head_dim * self.heads == dim
+        ), f"[{self.__class__.__name__}] Head dimension times the number of heads must be equal to embedding dimension (`in_dim` or `proj_dim`)"
         
-        self.Q = nn.Linear(dim, dim, bias=False)
-        self.K = nn.Linear(kv_dim if kv_dim is not None else dim, dim, bias=False)
-        self.V = nn.Linear(kv_dim if kv_dim is not None else dim, dim, bias=False)
+        self.Q = nn.Linear(in_dim, dim, bias=False)
+        self.K = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=False)
+        self.V = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=False)
+        self.out_linear = nn.Linear(dim, in_dim)
+
         # Reference from https://huggingface.co/transformers/_modules/transformers/models/bert/modeling_bert.html#BertModel
         self.attention_dropout = nn.Dropout(attention_dropout)
-        self.out_linear = nn.Linear(dim, dim, bias=False)
 
-        self.scale = self.head_dim ** (-0.5)
+        self.scale = head_dim ** (-0.5)
         self.mask_value = -torch.finfo(dtype).max  # pytorch default float type
 
     def forward(self, x, attention_mask=None):

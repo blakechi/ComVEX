@@ -11,8 +11,6 @@ class MAB(nn.Module):
         self, *, dim, heads, ff_dim_scale=4, pre_norm=False, **kwargs
     ):
         super().__init__()
-        self.dim = dim
-        self.heads = heads
 
         self.attention = LayerNorm(
             dim=dim,
@@ -21,8 +19,8 @@ class MAB(nn.Module):
             use_cross_attention=True,
             fn=Residual(
                 fn=MultiheadAttention(
-                    dim=dim,
-                    heads=self.heads, 
+                    dim,
+                    heads, 
                     **kwargs
                 ),
             ),
@@ -50,16 +48,14 @@ class SAB(nn.Module):
         self, *, dim, heads, ff_dim_scale=4, pre_norm=False, **kwargs
     ):
         super().__init__()
-        self.dim = dim
-        self.heads = heads
 
         self.attention = LayerNorm(
             dim=dim,
             use_pre_norm=pre_norm,
             fn=Residual(
                 fn=MultiheadAttention(
-                    dim=dim,
-                    heads=self.heads, 
+                    dim,
+                    heads, 
                     **kwargs
                 ),
             ),

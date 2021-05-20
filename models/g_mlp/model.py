@@ -16,11 +16,10 @@ class SpatialGatingUnit(nn.Module):
         nn.init.ones_(self.spatial_proj.bias)
 
         self.blend_with_attention = Residual(
-            MultiheadAttention(dim=dim, heads=1, head_dim=attention_dim, **kwargs)
+            MultiheadAttention(dim, 1, proj_dim=attention_dim, **kwargs)
         ) if attention_dim is not None else nn.Identity()
 
     def forward(self, x):
-        
         skip, gated = torch.chunk(x, chunks=2, dim=-1)
 
         gated = self.norm(gated)
@@ -79,7 +78,7 @@ class gMLPViTBase(ViTBase):
     def __init__(self, config: gMLPConfig = None) -> None:
         super().__init__(config.image_size, config.image_channel, config.patch_size)
 
-
+        
 
 
 
