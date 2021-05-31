@@ -1,22 +1,30 @@
 import torch
 from torch import nn
+from einops import repeat
 
 from models.vit import ViTBase
-from models.utils import Residual, MultiheadAttention
+from models.utils import Residual, MultiheadAttention, ProjectionHead
 from .config import gMLPConfig
+
+
+class gMLPBase(ViTBase):
+    def __init__(self, image_size, image_channel, patch_size) -> None:
+        super().__init__(image_size, image_channel, patch_size)
+
+        self.num_tokens = self.num_patches + 1  # Patches + CLS
 
 
 class SpatialGatingUnit(nn.Module):
     def __init__(self, dim, num_tokens, attention_dim=None, **kwargs):
         super().__init__()
 
-        self.norm = nn.LayerNorm(dim)
+        self.norm = nn.LayerNorm(dim//2)
         self.spatial_proj = nn.Conv1d(num_tokens, num_tokens, 1)
         nn.init.zeros_(self.spatial_proj.weight)
         nn.init.ones_(self.spatial_proj.bias)
 
-        self.blend_with_attention = Residual(
-            MultiheadAttention(dim, 1, proj_dim=attention_dim, **kwargs)
+        self.add_attention = Residual(
+            MultiheadAttention(dim//2, 1, proj_dim=attention_dim, **kwargs)
         ) if attention_dim is not None else nn.Identity()
 
     def forward(self, x):
@@ -24,7 +32,7 @@ class SpatialGatingUnit(nn.Module):
 
         gated = self.norm(gated)
         gated = self.spatial_proj(gated)
-        gated = self.blend_with_attention(gated)
+        gated = self.add_attention(gated)
 
         return skip*gated
 
@@ -74,14 +82,34 @@ class gMLPBackbone(nn.Module):
         return self.layers(x)
 
 
-class gMLPViTBase(ViTBase):
+class gMLPWithLinearClassifier(gMLPBase):
     def __init__(self, config: gMLPConfig = None) -> None:
         super().__init__(config.image_size, config.image_channel, config.patch_size)
 
+        self.linear_proj = nn.Linear(self.patch_dim, config.dim, bias=False)
+        self.CLS = nn.Parameter(torch.randn(1, 1, config.dim), requires_grad=True)
+        self.token_dropout = nn.Dropout(config.token_dropout)
+
+        self.backbone = gMLPBackbone(num_tokens=self.num_tokens, **config.__dict__)
+
+        self.proj_head = ProjectionHead(
+            config.dim,
+            config.num_classes,
+            config.pred_act_fnc_name,
+        )
+
+    def forward(self, x):
+        b, _, _, _ = x.shape  # b, c, h, w = x.shape
+
+        x = self.patch_and_flat(x)
+        x = self.linear_proj(x)
+        x = self.token_dropout(x)
+
+        # Prepend CLS token and add position code
+        CLS = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
+        x = torch.cat([CLS, x], dim=1)
+
+        x = self.backbone(x)
+
+        return self.proj_head(x[:, 0, :])
         
-
-
-
-# TODO
-# class gMLPDeiTBase(DeiTBase):
-#     pass

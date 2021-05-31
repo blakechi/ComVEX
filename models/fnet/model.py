@@ -70,16 +70,16 @@ class FNetBackbone(nn.Module):
         return self.dense(x)
 
 
-class FNetWithLinearHead(ViTBase):
+class FNetWithLinearClassifier(ViTBase):
     def __init__(self, config: FNetConfig = None) -> None:
         super().__init__(config.image_size, config.image_channel, config.patch_size)
 
         self.linear_proj = nn.Linear(self.patch_dim, config.dim, bias=False)
-        self.CLS = nn.Parameter(torch.randn(1, 1, config.dim))
+        self.CLS = nn.Parameter(torch.randn(1, 1, config.dim), requires_grad=True)
         self.position_code = nn.Parameter(torch.randn(1, self.num_patches + 1, config.dim))  # plus 1 for CLS
         self.token_dropout = nn.Dropout(config.token_dropout)
 
-        self.fnet_backbone = FNetBackbone(**config.__dict__)
+        self.backbone = FNetBackbone(**config.__dict__)
 
         self.proj_head = ProjectionHead(
             config.dim,
@@ -98,7 +98,7 @@ class FNetWithLinearHead(ViTBase):
         CLS = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
         x = torch.cat([CLS, x], dim=1) + self.position_code
 
-        x = self.fnet_backbone(x)
+        x = self.backbone(x)
 
         return self.proj_head(x[:, 0, :])
 

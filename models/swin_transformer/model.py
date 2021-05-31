@@ -4,7 +4,8 @@ from torch.utils.checkpoint import checkpoint
 from einops import rearrange
 from einops.layers.torch import Rearrange, Reduce
 
-from models.utils import Residual, LayerNorm, FeedForward
+from .config import SwinTransformerConfig
+from models.utils import Residual, LayerNorm, FeedForward, ProjectionHead
 
 
 class PatchMerging(nn.Module):
@@ -364,13 +365,17 @@ class SwinTransformerBackbone(SwinTransformerBase):
 
 
 class SwinTransformerWithLinearClassifier(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: SwinTransformerConfig = None):
         super().__init__()
 
-        self.swin = SwinTransformerBackbone(**config.__dict__)
-        self.proj_head = nn.LazyLinear(config.num_classes)
+        self.backbone = SwinTransformerBackbone(**config.__dict__)
+        self.proj_head = ProjectionHead(
+            config.dim,
+            config.num_classes,
+            config.pred_act_fnc_name,
+        )
 
     def forward(self, x, attention_mask=None):
-        x = self.swin(x, attention_mask)
+        x = self.backbone(x, attention_mask)
 
         return self.proj_head(x)

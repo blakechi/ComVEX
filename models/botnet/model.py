@@ -272,7 +272,7 @@ class BoTNetWithLinearClassifier(nn.Module):
 
         self.use_classifier = True if config.num_classes else False
 
-        self.botnet_backbone = BoTNetBackBone(config)
+        self.backbone = BoTNetBackBone(config)
 
         if self.use_classifier:
             # Reference from: https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
@@ -283,6 +283,6 @@ class BoTNetWithLinearClassifier(nn.Module):
             ]))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.botnet_backbone(x)
+        x = self.backbone(x)
 
         return self.out_linear(x)

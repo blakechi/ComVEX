@@ -19,10 +19,11 @@ class SwinTransformerConfig(object):
         ff_dim: int = None, 
         ff_dropout: float = 0.0,
         attention_dropout: float = 0.0,
-        token_dropout: float = 0.0,
+        token_dropout: float = 0.0, 
+        pred_act_fnc_name: str = "ReLU"
     ) -> None:
 
-        self.image_channel =image_channel 
+        self.image_channel = image_channel 
         self.image_size = image_size 
         self.patch_size = patch_size
         self.num_channels = num_channels
@@ -38,6 +39,7 @@ class SwinTransformerConfig(object):
         self.ff_dropout = ff_dropout
         self.attention_dropout = attention_dropout
         self.token_dropout = token_dropout
+        self.pred_act_fnc_name = pred_act_fnc_name
 
     @classmethod
     def SwinTransformer_T(

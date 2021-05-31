@@ -4,13 +4,13 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.fnet import FNetConfig, FNetWithLinearHead
+from models.fnet import FNetConfig, FNetWithLinearClassifier
 
 
 if __name__ == "__main__":
         
     fnet_config = FNetConfig.FNet_B_12_512(num_classes=1000)
-    fnet = FNetWithLinearHead(fnet_config)
+    fnet = FNetWithLinearClassifier(fnet_config)
 
     print(fnet)
 

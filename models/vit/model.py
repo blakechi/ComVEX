@@ -14,9 +14,9 @@ class ViTBase(nn.Module):
         assert image_size is not None, f"[{self.__class__.__name__}] Please specify input images' size."
         assert patch_size is not None, f"[{self.__class__.__name__}] Please specify patches' size."
 
-        self.num_patches = (image_size // patch_size) ** 2
-        self.patch_dim = (patch_size**2) * image_channel
         self.patch_size = patch_size
+        self.patch_dim = (patch_size**2) * image_channel
+        self.num_patches = (image_size // patch_size) ** 2
 
         assert (
             (self.num_patches**0.5) * patch_size == image_size
