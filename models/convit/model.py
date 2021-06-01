@@ -4,7 +4,7 @@ from einops import rearrange, repeat
 
 from models.vit import ViTBase
 from models.transformer import TransformerEncoderLayer
-from models.utils import Residual, LayerNorm, FeedForward, ProjectionHead
+from models.utils import Residual, LayerNorm, FeedForward, ProjectionHead, TokenWiseDropout
 from models.convit.config import ConViTConfig
 
 
@@ -207,7 +207,8 @@ class ConViTWithLinearClassifier(ViTBase):
 
         self.linear_proj = nn.Linear(self.patch_dim, config.dim, bias=False)
         self.CLS = nn.Parameter(torch.randn(1, 1, config.dim), requires_grad=True)
-        self.token_dropout = nn.Dropout(config.token_dropout)
+        # self.token_dropout = nn.Dropout(config.token_dropout)
+        self.token_dropout = TokenWiseDropout(config.token_dropout)
 
         self.backbone = ConViTBackbone(num_patches=self.num_patches, **config.__dict__)
 
