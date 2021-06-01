@@ -23,16 +23,15 @@ class SpatialGatingUnit(nn.Module):
         nn.init.zeros_(self.spatial_proj.weight)
         nn.init.ones_(self.spatial_proj.bias)
 
-        self.add_attention = Residual(
+        self.attention = Residual(
             MultiheadAttention(dim//2, 1, proj_dim=attention_dim, **kwargs)
-        ) if attention_dim is not None else nn.Identity()
+        ) if attention_dim is not None else None
 
     def forward(self, x):
         skip, gated = torch.chunk(x, chunks=2, dim=-1)
 
         gated = self.norm(gated)
-        gated = self.spatial_proj(gated)
-        gated = self.add_attention(gated)
+        gated = self.spatial_proj(gated) + self.attention(gated) if self.attention is not None else self.spatial_proj(gated)
 
         return skip*gated
 
