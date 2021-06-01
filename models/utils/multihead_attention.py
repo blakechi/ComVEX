@@ -7,8 +7,8 @@ class MultiheadAttention(nn.Module):
     def __init__(
         self, 
         in_dim, 
-        heads, 
         *,
+        heads=None, 
         kv_dim=None, 
         head_dim=None, 
         proj_dim=None, 
@@ -18,8 +18,13 @@ class MultiheadAttention(nn.Module):
     ):
         super().__init__()
 
-        self.heads = heads
         dim = proj_dim if proj_dim is not None else in_dim
+
+        assert (
+            heads is not None or head_dim is not None
+        ), f"[{self.__class__.__name__}] Either `heads` or `head_dim` must be specified."
+
+        self.heads = heads if heads is not None else dim // head_dim
         head_dim = head_dim if head_dim is not None else dim // heads
 
         assert (
@@ -31,8 +36,8 @@ class MultiheadAttention(nn.Module):
         self.V = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=False)
         self.out_linear = nn.Linear(dim, in_dim)
 
-        # Reference from https://huggingface.co/transformers/_modules/transformers/models/bert/modeling_bert.html#BertModel
-        self.attention_dropout = nn.Dropout(attention_dropout)
+        # Reference from`BertSelfAttention` (https://huggingface.co/transformers/_modules/transformers/models/bert/modeling_bert.html#BertModel)
+        self.attention_dropout = nn.Dropout2d(attention_dropout)
 
         self.scale = head_dim ** (-0.5)
         self.mask_value = -torch.finfo(dtype).max  # pytorch default float type
@@ -59,7 +64,6 @@ class MultiheadAttention(nn.Module):
             attention_mask = repeat(attention_mask, "b 1 n m -> b h n m", h=h)
             similarity.masked_fill_(attention_mask, self.mask_value)
 
-        # attention
         similarity = similarity.softmax(dim=-1)
         similarity = self.attention_dropout(similarity)
         weighted_tokens = einsum("b h n m, b h m d -> b h n d", similarity, v)

@@ -1,1 +1,1 @@
-from .model import Transformer
+from .model import Transformer, TransformerEncoderLayer

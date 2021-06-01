@@ -5,13 +5,13 @@ from models.utils import Residual, LayerNorm, FeedForward, MultiheadAttention
 
 
 class TransformerEncoderLayer(nn.Module):
-    def __init__(self, *, dim, heads, pre_norm=False, head_dim=None, ff_dim=None, **kwargs):
+    def __init__(self, dim, heads=None, head_dim=None, pre_norm=False, ff_dim=None, **kwargs):
         super().__init__()
 
         self.attention_block = LayerNorm(
             Residual(
                 MultiheadAttention(
-                    dim, heads, head_dim=head_dim, **kwargs
+                    dim, heads=heads, head_dim=head_dim, **kwargs
                 )
             ),
             dim=dim,
@@ -27,7 +27,7 @@ class TransformerEncoderLayer(nn.Module):
             use_pre_norm=pre_norm
         )
 
-    def forward(self, x, attention_mask):
+    def forward(self, x, attention_mask=None):
         x = self.attention_block(x, attention_mask)
 
         return self.ff_block(x)

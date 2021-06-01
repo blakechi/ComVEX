@@ -93,10 +93,10 @@ class BoTNetBlock(ResNetBlockBase):
             ReLU(),
             nn.Conv2d(
                 base_channel, 
-                out_channel, 
+                expand_channel, 
                 1
             ),
-            self.Norm(num_features=out_channel),
+            self.Norm(num_features=expand_channel),
         ]
         if 'stride' in kwargs and kwargs['stride'] == 2:  # If stride, add average pooling after BoTNetMHSA
             _layers.insert(
