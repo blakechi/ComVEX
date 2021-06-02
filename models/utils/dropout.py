@@ -12,7 +12,7 @@ def dimension_wise_dropout(x: torch.Tensor, dropout_rate: float = .0, dim: int =
     b, n, d = x.shape
 
     # Path dropout
-    x = your_module(x) + dimension_wise_dropout(x, 0.2, 0, training=True)
+    x = x + dimension_wise_dropout(your_module(x), 0.2, 0, training=True)
 
     # Batch-wise dropout
     x = dimension_wise_dropout(x, 0.2, 0, training=True)
