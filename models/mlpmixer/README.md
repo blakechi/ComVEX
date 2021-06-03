@@ -13,7 +13,7 @@ This is an PyTorch implementation of [MLP-Mixer: An all-MLP Architecture for Vis
    - `MLPMixer_B_32`
    - `MLPMixer_B_16`
    - `MLPMixer_L_32`
-   - `MLPMixer_L_16`
+   - `MLPMixer_L_16``
    - `MLPMixer_H_14`
 
 ## Modifications
