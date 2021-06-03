@@ -4,12 +4,10 @@ This is an PyTorch implementation of [MLP-Mixer: An all-MLP Architecture for Vis
 
 ## Objects
 
-1. `MLPMixerBase`
-2. `MLPMixerMLP`
-3. `MLPMixerLayer`
-4. `MLPMixerBackBone`
-5. `MLPMixer`
-6. `MLPMixerConfig`
+1. `MLPMixerLayer`
+2. `MLPMixerBackBone`
+3. `MLPMixer`
+4. `MLPMixerConfig`
    - `MLPMixer_S_32`
    - `MLPMixer_S_16`
    - `MLPMixer_B_32`
