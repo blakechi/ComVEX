@@ -1,24 +1,28 @@
 import torch
 from torch import nn
 
+from .dropout import PathDropout
+
+
 class Residual(nn.Module):
-    def __init__(self, fn, skip_connection_dropout=0.0, skip_connection_dropout_module=None):
+    def __init__(self, fn, path_dropout=0.):
         super(Residual, self).__init__()
 
         assert fn is not None, f"[{self.__class__.__name__}] Must give it a function (normaly, a neural net)"
         self._fn = fn
-        self.skip_connection_dropout = skip_connection_dropout_module(skip_connection_dropout) if skip_connection_dropout_module is not None else nn.Dropout(skip_connection_dropout)
+        self.path_dropout = PathDropout(path_dropout)
 
     def forward(self, x, *args, **kwargs):
         if isinstance(x, tuple) or isinstance(x, list):
-            return self._fn(x, *args, **kwargs) + self.skip_connection_dropout(x[0])  # assume the first element is the main hidden state
+            return x[0] + self.path_dropout(self._fn(x, *args, **kwargs))  # assume the first element is the main hidden state
         else:
-            return self._fn(x, *args, **kwargs) + self.skip_connection_dropout(x)
+            return x + self.path_dropout(self._fn(x, *args, **kwargs))
 
 # TODO: Refine it!!
 class LayerNorm(nn.Module):
     def __init__(self, fn=None, *, dim=None, use_pre_norm=False, use_cross_attention=False, cross_dim=None):
         super(LayerNorm, self).__init__()
+
         self._fn = fn
         self._use_pre_norm = use_pre_norm
         self._use_cross_attention = use_cross_attention
@@ -114,3 +118,19 @@ class ProjectionHead(nn.Module):
 
     def forward(self, x):
         return self.head(x)
+
+
+class MLP(nn.Module):
+    def __init__(self, dim, hidden_dim, act_fnc_name="GELU", ff_dropout=0.):
+        super().__init__()
+
+        self._net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.Dropout(ff_dropout),
+            getattr(nn, act_fnc_name)(),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(ff_dropout)
+        )
+
+    def forward(self, x):
+        return self._net(x)

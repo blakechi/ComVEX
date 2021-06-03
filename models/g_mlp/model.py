@@ -3,7 +3,7 @@ from torch import nn
 from einops import repeat
 
 from models.vit import ViTBase
-from models.utils import Residual, MultiheadAttention, ProjectionHead
+from models.utils import Residual, MultiheadAttention, ProjectionHead, TokenWiseDropout
 from .config import gMLPConfig
 
 
@@ -87,7 +87,8 @@ class gMLPWithLinearClassifier(gMLPBase):
 
         self.linear_proj = nn.Linear(self.patch_dim, config.dim, bias=False)
         self.CLS = nn.Parameter(torch.randn(1, 1, config.dim), requires_grad=True)
-        self.token_dropout = nn.Dropout(config.token_dropout)
+        # self.token_dropout = nn.Dropout(config.token_dropout)
+        self.token_dropout = TokenWiseDropout(config.token_dropout)
 
         self.backbone = gMLPBackbone(num_tokens=self.num_tokens, **config.__dict__)
 
