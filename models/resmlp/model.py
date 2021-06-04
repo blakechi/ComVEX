@@ -9,7 +9,14 @@ from models.utils import MLP, AffineTransform, PathDropout, LayerScaleBlock, Tok
 
 
 class ResMLPLayer(nn.Module):
-    def __init__(self, dim: int, num_patches: int, alpha: float, path_dropout=0., ff_dropout=0.):
+    def __init__(
+        self, 
+        dim: int, 
+        num_patches: int, 
+        alpha: float, 
+        path_dropout=0., 
+        ff_dropout=0.
+    ):
         super().__init__()
 
         self.token_mixer = nn.Sequential(OrderedDict([
