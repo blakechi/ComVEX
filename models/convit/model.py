@@ -1,3 +1,4 @@
+from models.utils.dropout import TokenDropout
 import torch
 from torch import nn, einsum
 from einops import rearrange, repeat
@@ -207,8 +208,8 @@ class ConViTWithLinearClassifier(ViTBase):
 
         self.linear_proj = nn.Linear(self.patch_dim, config.dim, bias=False)
         self.CLS = nn.Parameter(torch.randn(1, 1, config.dim), requires_grad=True)
-        # self.token_dropout = nn.Dropout(config.token_dropout)
-        self.token_dropout = TokenWiseDropout(config.token_dropout)
+        self.token_dropout = TokenDropout(config.token_dropout)
+        # self.token_dropout = TokenWiseDropout(config.token_dropout)
 
         self.backbone = ConViTBackbone(num_patches=self.num_patches, **config.__dict__)
 

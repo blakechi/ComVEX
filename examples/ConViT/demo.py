@@ -19,4 +19,4 @@ if __name__ == "__main__":
 
     # print("Input Shape:\n", x.shape)
     # print("Output Shape:\n", convit(x).shape)
-    s = SeperateConvXd(10, 20, dimension=4)
+    s = SeperateConvXd(10, 20, dimension=3)

@@ -13,6 +13,7 @@ class MultiheadAttention(nn.Module):
         head_dim=None, 
         proj_dim=None, 
         attention_dropout=0.0, 
+        ff_dropout=0.0, 
         dtype=torch.float32, 
         **rest
     ):
@@ -38,6 +39,7 @@ class MultiheadAttention(nn.Module):
 
         # Reference from`BertSelfAttention` (https://huggingface.co/transformers/_modules/transformers/models/bert/modeling_bert.html#BertModel)
         self.attention_dropout = nn.Dropout2d(attention_dropout)
+        self.out_dropout = nn.Dropout(ff_dropout)
 
         self.scale = head_dim ** (-0.5)
         self.mask_value = -torch.finfo(dtype).max  # pytorch default float type
@@ -66,7 +68,9 @@ class MultiheadAttention(nn.Module):
 
         similarity = similarity.softmax(dim=-1)
         similarity = self.attention_dropout(similarity)
-        weighted_tokens = einsum("b h n m, b h m d -> b h n d", similarity, v)
-        weighted_tokens = rearrange(weighted_tokens, "b h n d -> b n (h d)")
+        
+        out = einsum("b h n m, b h m d -> b h n d", similarity, v)
+        out = rearrange(out, "b h n d -> b n (h d)")
+        out = self.out_linear(out)
 
-        return self.out_linear(weighted_tokens)
+        return self.out_dropout(out)

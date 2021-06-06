@@ -40,6 +40,9 @@ def dimension_wise_dropout(x: torch.Tensor, dropout_rate: float = .0, dim: int =
 
 
 class TokenWiseDropout(nn.Module):
+    r"""
+    Dropout per tokens
+    """
     def __init__(self, p: float = 0.) -> None:  
         super().__init__()
         self.dropout_rate = p
@@ -66,6 +69,36 @@ class TokenWiseDropout(nn.Module):
             mask = mask.to(x.dtype)
 
         return x*self.scale*(mask.unsqueeze(-1))
+
+
+class TokenDropout(TokenWiseDropout):
+    r"""
+    Dropout for token features supported with padding masks
+    """
+    def forward(self, x: torch.Tensor, padding_mask: Optional[torch.BoolTensor] = None, preserve_tokens: int = 0) -> torch.Tensor:
+        r"""
+        Args:
+            x (b, n, d): The inpute tensor.
+            padding_mask (b, n): True means to mask and False means to drop. Default: None
+            preserve_tokens: When a sequence's or data sample's number of tokens is less than this number,
+                its tokens won't be dropped. Need to be smaller than `n`. Default: 0
+        """
+        b, n, d = x.shape
+
+        if self.dropout_rate == 0. or not self.training:
+            return x
+
+        mask = self.bernoulli.sample((b, n, d))
+        if padding_mask is not None:
+
+            mask = (
+                mask.to(torch.bool) |  # toke features dropout
+                padding_mask.unsqueeze(-1) |  # preserve padding tokens
+                (padding_mask.sum(dim=-1) > (n - preserve_tokens))[(..., ) + (None,)*2]  # preserve sequences that are too short (unsqueeze at the last dimension twice)
+            )
+            mask = mask.to(x.dtype)
+
+        return x*self.scale*mask
 
 
 class PathDropout(nn.Module):
