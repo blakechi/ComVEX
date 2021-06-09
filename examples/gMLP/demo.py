@@ -8,7 +8,7 @@ from models.g_mlp import gMLPConfig, gMLPWithLinearClassifier
 
 
 if __name__ == "__main__":
-        
+
     gmlp_config = gMLPConfig.gMLP_B(num_classes=1000)
     gmlp = gMLPWithLinearClassifier(gmlp_config)
 

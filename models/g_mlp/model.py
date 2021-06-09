@@ -45,7 +45,12 @@ class gMLPBlock(nn.Module):
                 nn.LayerNorm(dim),
                 nn.Linear(dim, ffn_dim),
                 nn.GELU(),
-                SpatialGatingUnit(ffn_dim, num_tokens, attention_dim, **kwargs),
+                SpatialGatingUnit(
+                    ffn_dim,
+                    num_tokens,
+                    attention_dim,
+                    **kwargs
+                ),
                 nn.Linear(ffn_dim // 2, dim)
             )
         )
@@ -69,7 +74,7 @@ class gMLPBackbone(nn.Module):
 
         self.layers = nn.Sequential(*[
             gMLPBlock(
-                dim,  
+                dim,
                 ffn_dim,
                 num_tokens,
                 attention_dim=attention_dim,

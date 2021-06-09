@@ -1,8 +1,8 @@
 class gMLPConfig(object):
     def __init__(
         self,
-        image_channel: int, 
-        image_size: int, 
+        image_channel: int,
+        image_size: int,
         patch_size: int,
         depth: int,
         dim: int,
@@ -21,7 +21,7 @@ class gMLPConfig(object):
         self.depth = depth
         self.dim = dim
         self.ffn_dim = ffn_dim
-        self.num_classes = num_classes 
+        self.num_classes = num_classes
         self.pred_act_fnc_name = pred_act_fnc_name
         self.attention_dim = attention_dim
         self.attention_dropout = attention_dropout
@@ -40,7 +40,7 @@ class gMLPConfig(object):
             num_classes=num_classes,
             **kwargs
         )
-        
+
     @classmethod
     def gMLP_S(cls, num_classes, **kwargs):
         return cls(
@@ -53,7 +53,7 @@ class gMLPConfig(object):
             num_classes=num_classes,
             **kwargs
         )
-        
+
     @classmethod
     def gMLP_B(cls, num_classes, **kwargs):
         return cls(
