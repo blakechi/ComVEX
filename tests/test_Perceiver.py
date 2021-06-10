@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.perceiver import Perceiver
+from comvex.perceiver import Perceiver
 
 # === Instantiate your Model ===
 # - For single model

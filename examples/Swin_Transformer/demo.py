@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.swin_transformer import SwinTransformerConfig, SwinTransformerWithLinearClassifier
+from comvex.swin_transformer import SwinTransformerConfig, SwinTransformerWithLinearClassifier
 
 
 if __name__ == "__main__":

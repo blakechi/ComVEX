@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.convit import ConViTConfig, ConViTWithLinearClassifier
+from comvex.convit import ConViTConfig, ConViTWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations

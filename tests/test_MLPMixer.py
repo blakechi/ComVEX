@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.mlpmixer import MLPMixerConfig, MLPMixerWithLinearClassifier
+from comvex.mlpmixer import MLPMixerConfig, MLPMixerWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations

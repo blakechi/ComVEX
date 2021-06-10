@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.resmlp import ResMLPConfig, ResMLPWithLinearClassifier
+from comvex.resmlp import ResMLPConfig, ResMLPWithLinearClassifier
 
 
 if __name__ == "__main__":

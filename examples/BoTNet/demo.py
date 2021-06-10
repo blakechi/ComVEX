@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.botnet import BoTNetWithLinearClassifier, BoTNetConfig
+from comvex.botnet import BoTNetWithLinearClassifier, BoTNetConfig
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.utils import ResNetWithLinearClassifier, ResNetConfig
+from comvex.utils import ResNetWithLinearClassifier, ResNetConfig
 
 
 if __name__ == "__main__":

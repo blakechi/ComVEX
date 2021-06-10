@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.resmlp import ResMLPConfig, ResMLPWithLinearClassifier
+from comvex.resmlp import ResMLPConfig, ResMLPWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations

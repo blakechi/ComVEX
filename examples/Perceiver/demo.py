@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.perceiver import Perceiver
+from comvex.perceiver import Perceiver
 
 
 if __name__ == "__main__":

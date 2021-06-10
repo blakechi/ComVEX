@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.transunet import TransUNet
+from comvex.transunet import TransUNet
 
 # === Instantiate your Model ===
 # - For single model

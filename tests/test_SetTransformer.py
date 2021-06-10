@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.set_transformer import SetTransformer, ISAB
+from comvex.set_transformer import SetTransformer, ISAB
 
 # === Instantiate your Model ===
 # - For single model

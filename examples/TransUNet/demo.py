@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.transunet import TransUNet
+from comvex.transunet import TransUNet
 
 
 if __name__ == "__main__":

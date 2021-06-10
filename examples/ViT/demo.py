@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.vit import ViT
+from comvex.vit import ViT
 
 
 if __name__ == "__main__":

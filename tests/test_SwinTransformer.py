@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.swin_transformer import SwinTransformerConfig, SwinTransformerWithLinearClassifier
+from comvex.swin_transformer import SwinTransformerConfig, SwinTransformerWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations

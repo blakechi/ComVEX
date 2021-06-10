@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.g_mlp import gMLPConfig, gMLPWithLinearClassifier
+from comvex.g_mlp import gMLPConfig, gMLPWithLinearClassifier
 
 
 if __name__ == "__main__":

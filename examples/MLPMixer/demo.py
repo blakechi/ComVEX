@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.mlpmixer import MLPMixerConfig, MLPMixerWithLinearClassifier
+from comvex.mlpmixer import MLPMixerConfig, MLPMixerWithLinearClassifier
 
 
 if __name__ == "__main__":

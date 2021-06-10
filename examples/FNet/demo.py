@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.fnet import FNetConfig, FNetWithLinearClassifier
+from comvex.fnet import FNetConfig, FNetWithLinearClassifier
 
 
 if __name__ == "__main__":

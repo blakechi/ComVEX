@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.fnet import FNetConfig, FNetWithLinearClassifier
+from comvex.fnet import FNetConfig, FNetWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations

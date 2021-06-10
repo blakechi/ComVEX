@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.botnet import BoTNetConfig, BoTNetWithLinearClassifier
+from comvex.botnet import BoTNetConfig, BoTNetWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations

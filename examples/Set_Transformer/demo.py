@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.set_transformer import SetTransformer, ISAB
+from comvex.set_transformer import SetTransformer, ISAB
 
 
 if __name__ == "__main__":

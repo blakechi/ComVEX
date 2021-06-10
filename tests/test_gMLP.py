@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.g_mlp import gMLPConfig, gMLPWithLinearClassifier
+from comvex.g_mlp import gMLPConfig, gMLPWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations

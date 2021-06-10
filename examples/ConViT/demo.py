@@ -2,21 +2,17 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 
-import torch
-
-from models.convit import ConViTConfig, ConViTWithLinearClassifier
-from models.utils.efficient_net.model import SeperateConvXd
+from comvex.convit import ConViTConfig, ConViTWithLinearClassifier
 
 
 if __name__ == "__main__":
 
-    # convit_config = ConViTConfig.ConViT_B(num_classes=1000, token_dropout=0.2)
-    # convit = ConViTWithLinearClassifier(convit_config)
+    convit_config = ConViTConfig.ConViT_B(num_classes=1000, token_dropout=0.2)
+    convit = ConViTWithLinearClassifier(convit_config)
 
-    # print(convit)
+    print(convit)
 
-    # x = torch.randn(1, 3, 224, 224)
+    x = torch.randn(1, 3, 224, 224)
 
-    # print("Input Shape:\n", x.shape)
-    # print("Output Shape:\n", convit(x).shape)
-    s = SeperateConvXd(10, 20, dimension=3)
+    print("Input Shape:\n", x.shape)
+    print("Output Shape:\n", convit(x).shape)

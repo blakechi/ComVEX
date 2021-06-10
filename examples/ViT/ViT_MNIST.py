@@ -11,8 +11,8 @@ sys.path.insert(0, os.getcwd())
 import torch
 from torchvision import transforms, datasets
 
-from models.vit import ViT
-from models.transunet import TransUNet
+from comvex.vit import ViT
+from comvex.transunet import TransUNet
 
 EPOCH = 10
 BATCH_SIZE = 32

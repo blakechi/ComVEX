@@ -4,7 +4,7 @@ sys.path.insert(0, os.getcwd())
 
 import torch
 
-from models.utils import UNet
+from comvex.utils import UNet
 
 
 if __name__ == "__main__":

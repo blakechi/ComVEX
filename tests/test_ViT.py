@@ -2,7 +2,7 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.vit import ViT
+from comvex.vit import ViT
 
 # === Instantiate your Model ===
 # - For single model
