@@ -1,4 +1,3 @@
-import gc
 import torch
 from .utils import *
 
@@ -36,6 +35,3 @@ def test_forward():
 
     assert_output_shape_wrong(out, expected_shape)
     assert_output_has_nan(out)
-
-del model
-gc.collect()
