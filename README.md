@@ -1,4 +1,4 @@
-# ComVEX: COMputer Vision EXpo
+# ComVEX: Computer Vision EXpo
 
 Hi there! This is a reimplementation library for computer vision models by **PyTorch** and **Einops**. Our mission is to bridge papers and codes with consistent and clear implementations.
 
