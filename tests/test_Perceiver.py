@@ -9,9 +9,9 @@ from comvex.perceiver import Perceiver
 model = Perceiver(
     data_shape=[3, 224, 224],
     cross_heads=1,
-    num_latent_tokens=1024,
-    dim=512, 
-    heads=16, 
+    num_latent_tokens=32,
+    dim=128, 
+    heads=4, 
     layers_indice=[0] + [1]*7, 
     num_latent_transformers_in_layers=[6]*2, 
     num_bands=64,
@@ -29,7 +29,7 @@ model = Perceiver(
 # === Settings ===
 # - Required:
 input_shape = (1, 3, 224, 224)
-expected_shape = (1, 512)
+expected_shape = (1, 128)
 # - Optional:
 
 # === Test Cases ===
