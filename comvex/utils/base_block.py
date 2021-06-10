@@ -10,7 +10,8 @@ class Residual(nn.Module):
 
         assert fn is not None, f"[{self.__class__.__name__}] Must give it a function (normaly, a neural net)"
         self._fn = fn
-        self.path_dropout = PathDropout(path_dropout)
+        self.path_dropout = nn.Dropout(path_dropout)
+        # self.path_dropout = PathDropout(path_dropout)
 
     def forward(self, x, *args, **kwargs):
         if isinstance(x, tuple) or isinstance(x, list):

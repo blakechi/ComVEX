@@ -7,7 +7,7 @@ Hi there! This is a reimplementation library for computer vision models by **PyT
 1. Consistent Structure \
    Every models share similar building objects:
 
-   - `xxxBase`: A model's base. For checking common input arguments and storing important variables. Sometimes it also provides necessary tensor operations, like patching and flattening images in ViT.
+   - `xxxBase`: A model's base. For checking common input arguments and storing important variables. Sometimes it can also provide specified weight initialization methods or necessary tensor operations, like patching and flattening images in ViT.
    - `xxxBackbone`: A model's backbone architecture. It includes every needed components to build the model except the classifier.
    - `xxxWithLinearClassifier`: `xxxBackbone` plus a projection head as its classifier. Only accept `xxxConfig` as its argument. Similar to Huggingface. Might provide some variants for differenet objective in the future.
    - `xxxConfig`: A configuration for all possible coefficients. It also provides model specializations mentioned in the papers.

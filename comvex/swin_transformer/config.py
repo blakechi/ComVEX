@@ -19,6 +19,7 @@ class SwinTransformerConfig(object):
         ff_dropout: float = 0.0,
         attention_dropout: float = 0.0,
         token_dropout: float = 0.0, 
+        path_dropout: float = 0.0,
         pred_act_fnc_name: str = "ReLU"
     ) -> None:
 
@@ -38,6 +39,7 @@ class SwinTransformerConfig(object):
         self.ff_dropout = ff_dropout
         self.attention_dropout = attention_dropout
         self.token_dropout = token_dropout
+        self.path_dropout = path_dropout
         self.pred_act_fnc_name = pred_act_fnc_name
 
     @classmethod

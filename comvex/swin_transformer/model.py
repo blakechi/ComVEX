@@ -5,7 +5,7 @@ from einops import rearrange
 from einops.layers.torch import Rearrange, Reduce
 
 from .config import SwinTransformerConfig
-from comvex.utils import Residual, LayerNorm, FeedForward, ProjectionHead
+from comvex.utils import LayerNorm, FeedForward, ProjectionHead, TokenDropout, PathDropout
 
 
 class SwinTransformerBase(nn.Module):
@@ -32,22 +32,6 @@ class SwinTransformerBase(nn.Module):
         self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
 
 
-class PatchMerging(nn.Module):
-    def __init__(self, channel):
-        super().__init__()
-
-        self.merge = Rearrange("b (h p) (w q) c -> b h w (p q c)", p=2, q=2)
-        self.proj_head = nn.Sequential(
-            nn.LayerNorm(4*channel),
-            nn.Linear(4*channel, 2*channel, bias=False)
-        )
-
-    def forward(self, x):
-        x = self.merge(x)
-
-        return self.proj_head(x)
-
-
 class WindowAttentionBase(nn.Module):
     def __init__(self, *, dim, window_size, heads=None, head_dim=None, dtype=torch.float32, **not_used):
         super().__init__()
@@ -66,7 +50,7 @@ class WindowAttentionBase(nn.Module):
         ), f"[{self.__class__.__name__}] Head dimension times the number of heads must be equal to embedding dimension. ({self.head_dim}*{self.heads} != {self.dim})"
 
         self.relative_position = nn.Parameter(
-            torch.empty([self.heads, (2*self.window_size[0] - 1)*(2*self.window_size[1] - 1)], requires_grad=True)
+            torch.randn([self.heads, (2*self.window_size[0] - 1)*(2*self.window_size[1] - 1)], requires_grad=True)
         )
         self.register_buffer("relative_position_index", self._get_relative_position_index())
 
@@ -111,7 +95,24 @@ class WindowAttentionBase(nn.Module):
     def _init_weights(self, m):
         if isinstance(m, nn.Parameter):
             # Reference from: https://github.com/microsoft/Swin-Transformer/blob/main/models/swin_transformer.py#L110
-            nn.init.trunc_normal_(m, std=0.02)
+            # nn.init.trunc_normal_(m, std=0.02)
+            nn.init.kaiming_normal_(m.weight)
+
+
+class PatchMerging(nn.Module):
+    def __init__(self, channel):
+        super().__init__()
+
+        self.merge = Rearrange("b (h p) (w q) c -> b h w (p q c)", p=2, q=2)
+        self.proj_head = nn.Sequential(
+            nn.LayerNorm(4*channel),
+            nn.Linear(4*channel, 2*channel, bias=False)
+        )
+
+    def forward(self, x):
+        x = self.merge(x)
+
+        return self.proj_head(x)
 
 
 class WindowAttention(WindowAttentionBase):
@@ -125,9 +126,6 @@ class WindowAttention(WindowAttentionBase):
         self.apply(self._init_weights)
 
     def forward(self, x, attention_mask=None):
-        return self._forward(x, attention_mask)
-
-    def _forward(self, x, attention_mask=None):
         b, H, W, c, g = *x.shape, self.heads
 
         x = self.split_into_windows(x)
@@ -167,7 +165,7 @@ class ShiftWindowAttention(WindowAttention):
         x = torch.roll(x, (-self.shifts, -self.shifts), (-3, -2))
 
         attention_mask = attention_mask | self.shifted_attnetion_mask if attention_mask is not None else self.shifted_attention_mask
-        x = self._forward(x, attention_mask)
+        x = super().forward(x, attention_mask)
 
         x = torch.roll(x, (self.shifts, self.shifts), (-3, -2))
 
@@ -212,30 +210,37 @@ class SwinTransformerLayer(nn.Module):
         super().__init__()
 
         self.attention_block = LayerNorm(
-            Residual(
-                ShiftWindowAttention(
-                    dim=dim, window_size=window_size, shifts=shifts, input_resolution=input_resolution, **kwargs
-                ) if shifts is not None else WindowAttention(
-                    dim=dim, window_size=window_size, **kwargs
-                )
+            ShiftWindowAttention(
+                dim=dim,
+                window_size=window_size,
+                shifts=shifts,
+                input_resolution=input_resolution,
+                **kwargs
+            ) if shifts is not None else WindowAttention(
+                dim=dim,
+                window_size=window_size,
+                **kwargs
             ),
             dim=dim,
             use_pre_norm=use_pre_norm
         )
+        self.attention_path_dropout = PathDropout(kwargs["path_dropout"] if "path_dropout" in kwargs else 0.)
+
         self.ff_block = LayerNorm(
-            Residual(
-                FeedForward(
-                    dim=dim, hidden_dim=ff_dim if ff_dim is not None else 4*dim, **kwargs
-                )
+            FeedForward(
+                dim=dim, hidden_dim=ff_dim if ff_dim is not None else 4*dim, **kwargs
             ),
             dim=dim,
             use_pre_norm=use_pre_norm
         )
+        self.ff_path_dropout = PathDropout(kwargs["path_dropout"] if "path_dropout" in kwargs else 0.)
+
 
     def forward(self, x, attention_mask):
-        x = self.attention_block(x, attention_mask)
+        x = x + self.attention_path_dropout(self.attention_block(x, attention_mask))
+        x = x + self.ff_path_dropout(self.ff_block(x))
 
-        return self.ff_block(x)
+        return x
 
 
 class SwinTransformerBlock(nn.Module):
@@ -295,16 +300,14 @@ class SwinTransformerBackbone(SwinTransformerBase):
     ):
         super().__init__(image_channel, image_size, patch_size, num_channels, num_layers_in_stages)
 
-        self.patch_embedding = nn.Sequential(
-            nn.Linear(self.num_channels_after_patching, self.num_channels)
-        )
+        self.patch_embedding = nn.Linear(self.num_channels_after_patching, self.num_channels)
 
         self.use_absolute_position = use_absolute_position
         if use_absolute_position:
             self.absolute_position = nn.Parameter(torch.empty(1, self.num_patches, self.num_channels))
             nn.init.trunc_normal_(self.absolute_position, std=0.02)
 
-        self.token_dropout = nn.Dropout(token_dropout)
+        self.token_dropout = TokenDropout(token_dropout)
 
         self.stages = nn.ModuleList([
             nn.ModuleList(self._build_stage(

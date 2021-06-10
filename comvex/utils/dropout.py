@@ -111,4 +111,4 @@ class PathDropout(nn.Module):
         Args:
             x (b, ...): The inpute tensor. Assume `batch` is at dimension 0.
         """
-        return dimension_wise_dropout(x, self.dropout_rate, 0, training=self.training) 
+        return dimension_wise_dropout(x, self.dropout_rate, 0, training=self.training)

@@ -48,8 +48,3 @@ def test_forward():
 # Add other tests if any
 def test_something():
     ...
-
-# === Release Memory ===
-# - For single model
-del model
-gc.collect()

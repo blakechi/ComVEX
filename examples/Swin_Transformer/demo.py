@@ -15,6 +15,12 @@ if __name__ == "__main__":
     print(swin_transformer)
 
     x = torch.randn(1, 3, 224, 224)
-
+    out = swin_transformer(x)
     print("Input Shape:\n", x.shape)
-    print("Output Shape:\n", swin_transformer(x).shape)
+    print("Output Shape:\n", out.shape)
+
+    out = out.mean()
+    out.backward()
+
+    for name, p in swin_transformer.named_parameters():
+        print(name, p.grad)
