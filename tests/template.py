@@ -1,3 +1,4 @@
+import gc
 import torch
 from .utils import *
 
@@ -42,7 +43,13 @@ def test_forward():
 #         assert_output_has_nan(out)
     
 #         del model
-    
+#         gc.collect()
+
 # Add other tests if any
 def test_something():
     ...
+
+# === Release Memory ===
+# - For single model
+del model
+gc.collect()

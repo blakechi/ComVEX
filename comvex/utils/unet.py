@@ -1,5 +1,3 @@
-from abc import abstractmethod
-
 import torch
 from torch import nn
 from torchvision import transforms
