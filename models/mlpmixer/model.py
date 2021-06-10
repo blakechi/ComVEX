@@ -16,12 +16,12 @@ class MLPMixerLayer(nn.Module):
         self.token_mixer = nn.Sequential(
             nn.LayerNorm(num_channels),
             Rearrange("b s c -> b c s"),
-            MLP(num_tokens, token_mlp_dim, ff_dropout),
+            MLP(num_tokens, token_mlp_dim, ff_dropout=ff_dropout),
             Rearrange("b c s -> b s c"),
         )
         self.channel_mixer = nn.Sequential(
             nn.LayerNorm(num_channels),
-            MLP(num_channels, channel_mlp_dim, ff_dropout)
+            MLP(num_channels, channel_mlp_dim, ff_dropout=ff_dropout)
         )
 
     def forward(self, x):
@@ -43,7 +43,7 @@ class MLPMixerBackBone(ViTBase):
         ff_dropout=0.0,
         **kwargs
     ):
-        super().__init__(image_channel, image_size, patch_size)
+        super().__init__(image_size, image_channel, patch_size)
 
         self.linear_proj = nn.Linear(self.patch_dim, self.patch_dim)
         self.encoder = nn.Sequential(OrderedDict([
@@ -52,7 +52,7 @@ class MLPMixerBackBone(ViTBase):
         ]))
         self.pooler = nn.Sequential(
             nn.LayerNorm(self.patch_dim),
-            Reduce("b s c -> b () c", "mean")    
+            Reduce("b s c -> b c", "mean")    
         )
         
     def forward(self, x):
@@ -69,11 +69,11 @@ class MLPMixerBackBone(ViTBase):
         return self.pooler(x)
         
 
-class MLPMixer(MLPMixerBackBone):
+class MLPMixerWithLinearClassifier(MLPMixerBackBone):
     def __init__(self, config: MLPMixerConfig = None) -> None:
         super().__init__(**config.__dict__)
 
-        self.proj_head = nn.Linear(self.dim, config.num_classes)
+        self.proj_head = nn.Linear(self.patch_dim, config.num_classes)
         nn.init.zeros_(self.proj_head.weight.data)  # from the original paper (Appendix E) (?)
         nn.init.zeros_(self.proj_head.bias.data)  # from the original paper (Appendix E) (?)
 

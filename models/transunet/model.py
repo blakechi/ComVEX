@@ -1,9 +1,8 @@
-import torch
 from torch import nn
-from einops.layers.torch import Rearrange, Reduce
+from einops.layers.torch import Rearrange
 
 from models.transunet.utils import TransUNetEncoderConvBlock, TransUNetViT
-from models.utils import FeedForward, UNetBase, UNetDecoder
+from models.utils import UNetBase, UNetDecoder
 
 
 class TransUNetEncoder(nn.Module):

@@ -2,11 +2,11 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.g_mlp import gMLPConfig, gMLPWithLinearClassifier
+from models.fnet import FNetConfig, FNetWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations
-specializations = [attr for attr in dir(gMLPConfig) if attr.startswith("gMLP")]
+specializations = [attr for attr in dir(FNetConfig) if attr.startswith("FNet")]
 
 # === Settings ===
 # - Required:
@@ -21,8 +21,8 @@ kwargs['num_classes'] = 10
 def test_forward():
     for spec in specializations:
         print(spec)
-        config = getattr(gMLPConfig, spec)(**kwargs)
-        model = gMLPWithLinearClassifier(config)
+        config = getattr(FNetConfig, spec)(**kwargs)
+        model = FNetWithLinearClassifier(config)
         model.eval()
 
         x = torch.randn(input_shape)

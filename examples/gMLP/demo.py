@@ -9,7 +9,7 @@ from models.g_mlp import gMLPConfig, gMLPWithLinearClassifier
 
 if __name__ == "__main__":
 
-    gmlp_config = gMLPConfig.gMLP_B(num_classes=1000)
+    gmlp_config = gMLPConfig.gMLP_B(num_classes=1000, ff_dropout=0.1)
     gmlp = gMLPWithLinearClassifier(gmlp_config)
 
     print(gmlp)

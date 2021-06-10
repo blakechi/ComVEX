@@ -11,7 +11,6 @@ class BoTNetConfig(ResNetConfig):
         conv_base_block_name: str,
         bot_base_block_name: str,
         num_blocks_in_layer: list, 
-        *,
         num_heads: int = 4,
         bot_block_indicator: list = [1, 1, 1],
         num_classes: Optional[int] = None,
@@ -74,13 +73,14 @@ class BoTNetConfig(ResNetConfig):
         ]
 
     @classmethod
-    def BoTNet_50(cls):
+    def BoTNet_50(cls, **kwargs):
         return cls(
             3,
             1024,
             "ResNetFullPreActivationBottleneckBlock",
             "BoTNetFullPreActivationBlock",
             [3, 4, 6, 3],
+            **kwargs
         )
 
     @classmethod

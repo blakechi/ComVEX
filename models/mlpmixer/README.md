@@ -6,7 +6,7 @@ This is an PyTorch implementation of [MLP-Mixer: An all-MLP Architecture for Vis
 
 1. `MLPMixerLayer`
 2. `MLPMixerBackBone`
-3. `MLPMixer`
+3. `MLPMixerWithLinearClassifier`
 4. `MLPMixerConfig`
    - `MLPMixer_S_32`
    - `MLPMixer_S_16`

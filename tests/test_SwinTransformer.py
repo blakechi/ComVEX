@@ -2,11 +2,11 @@ import torch
 from .utils import *
 
 # === Import model-related objects ===
-from models.g_mlp import gMLPConfig, gMLPWithLinearClassifier
+from models.swin_transformer import SwinTransformerConfig, SwinTransformerWithLinearClassifier
 
 # === Instantiate your Model ===
 # - For specializations
-specializations = [attr for attr in dir(gMLPConfig) if attr.startswith("gMLP")]
+specializations = [attr for attr in dir(SwinTransformerConfig) if attr.startswith("SwinTransformer")]
 
 # === Settings ===
 # - Required:
@@ -19,10 +19,11 @@ kwargs['num_classes'] = 10
 # === Test Cases ===
 # Default test for specializations
 def test_forward():
+    print(specializations)
     for spec in specializations:
         print(spec)
-        config = getattr(gMLPConfig, spec)(**kwargs)
-        model = gMLPWithLinearClassifier(config)
+        config = getattr(SwinTransformerConfig, spec)(**kwargs)
+        model = SwinTransformerWithLinearClassifier(config)
         model.eval()
 
         x = torch.randn(input_shape)

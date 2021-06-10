@@ -1,6 +1,3 @@
-from typing import Optional
-
-
 class MLPMixerConfig(object):
     def __init__(
         self, 
@@ -25,7 +22,7 @@ class MLPMixerConfig(object):
         self.ff_dropout = ff_dropout
 
     @classmethod
-    def MLPMixer_S_32(cls, num_classes: int, ff_dropout: float = 0.0) -> "MLPMixerConfig":
+    def MLPMixer_S_32(cls, num_classes: int, **kwargs) -> "MLPMixerConfig":
         return cls(
             image_channel=3,
             image_size=224,
@@ -34,11 +31,11 @@ class MLPMixerConfig(object):
             token_mlp_dim=256,
             channel_mlp_dim=2048,
             num_classes=num_classes,
-            ff_dropout=0.0
+            **kwargs
         )
 
     @classmethod
-    def MLPMixer_S_16(cls, num_classes: int, ff_dropout: float = 0.0) -> "MLPMixerConfig":
+    def MLPMixer_S_16(cls, num_classes: int, **kwargs) -> "MLPMixerConfig":
         return cls(
             image_channel=3,
             image_size=224,
@@ -47,11 +44,11 @@ class MLPMixerConfig(object):
             token_mlp_dim=256,
             channel_mlp_dim=2048,
             num_classes=num_classes,
-            ff_dropout=0.0
+            **kwargs
         )
 
     @classmethod
-    def MLPMixer_B_32(cls, num_classes: int, ff_dropout: float = 0.0) -> "MLPMixerConfig":
+    def MLPMixer_B_32(cls, num_classes: int, **kwargs) -> "MLPMixerConfig":
         return cls(
             image_channel=3,
             image_size=224,
@@ -60,11 +57,11 @@ class MLPMixerConfig(object):
             token_mlp_dim=384,
             channel_mlp_dim=3072,
             num_classes=num_classes,
-            ff_dropout=0.0
+            **kwargs
         )
 
     @classmethod
-    def MLPMixer_B_16(cls, num_classes: int, ff_dropout: float = 0.0) -> "MLPMixerConfig":
+    def MLPMixer_B_16(cls, num_classes: int, **kwargs) -> "MLPMixerConfig":
         return cls(
             image_channel=3,
             image_size=224,
@@ -73,11 +70,11 @@ class MLPMixerConfig(object):
             token_mlp_dim=384,
             channel_mlp_dim=3072,
             num_classes=num_classes,
-            ff_dropout=0.0
+            **kwargs
         )
 
     @classmethod
-    def MLPMixer_L_32(cls, num_classes: int, ff_dropout: float = 0.0) -> "MLPMixerConfig":
+    def MLPMixer_L_32(cls, num_classes: int, **kwargs) -> "MLPMixerConfig":
         return cls(
             image_channel=3,
             image_size=224,
@@ -86,11 +83,11 @@ class MLPMixerConfig(object):
             token_mlp_dim=512,
             channel_mlp_dim=4096,
             num_classes=num_classes,
-            ff_dropout=0.0
+            **kwargs
         )
 
     @classmethod
-    def MLPMixer_L_16(cls, num_classes: int, ff_dropout: float = 0.0) -> "MLPMixerConfig":
+    def MLPMixer_L_16(cls, num_classes: int, **kwargs) -> "MLPMixerConfig":
         return cls(
             image_channel=3,
             image_size=224,
@@ -99,11 +96,11 @@ class MLPMixerConfig(object):
             token_mlp_dim=512,
             channel_mlp_dim=4096,
             num_classes=num_classes,
-            ff_dropout=0.0
+            **kwargs
         )
 
     @classmethod
-    def MLPMixer_H_14(cls, num_classes: int, ff_dropout: float = 0.0) -> "MLPMixerConfig":
+    def MLPMixer_H_14(cls, num_classes: int, **kwargs) -> "MLPMixerConfig":
         return cls(
             image_channel=3,
             image_size=224,
@@ -112,6 +109,6 @@ class MLPMixerConfig(object):
             token_mlp_dim=640,
             channel_mlp_dim=5120,
             num_classes=num_classes,
-            ff_dropout=0.0
+            **kwargs
         )
     

@@ -8,6 +8,30 @@ from .config import SwinTransformerConfig
 from models.utils import Residual, LayerNorm, FeedForward, ProjectionHead
 
 
+class SwinTransformerBase(nn.Module):
+    def __init__(self, image_channel, image_size, patch_size, num_channels, num_layers_in_stages, **rest):
+        super().__init__()
+
+        assert image_channel is not None, f"[{self.__class__.__name__}] Please specify the number of input images' channels."
+        assert image_size is not None, f"[{self.__class__.__name__}] Please specify input images' size."
+        assert patch_size is not None, f"[{self.__class__.__name__}] Please specify patches' size."
+        assert len(num_layers_in_stages) == 4, f"[{self.__class__.__name__}] The number of stages should be 4, but got {len(num_layers_in_stages)}"
+        for num_layers in num_layers_in_stages:
+            assert num_layers % 2 == 0, f"[{self.__class__.__name__}] The number of layers in stages should be an even number, but got {num_layers}"
+
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.num_patches = (image_size // patch_size) ** 2
+        self.num_channels = num_channels
+        self.num_channels_after_patching = (patch_size**2) * image_channel
+
+        assert (
+            (self.num_patches**0.5) * patch_size == image_size
+        ), f"[{self.__class__.__name__}] Image size must be divided by the patch size."
+
+        self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
+
+
 class PatchMerging(nn.Module):
     def __init__(self, channel):
         super().__init__()
@@ -253,30 +277,6 @@ class SwinTransformerBlock(nn.Module):
         return x
 
 
-class SwinTransformerBase(nn.Module):
-    def __init__(self, image_channel, image_size, patch_size, num_channels, num_layers_in_stages):
-        super().__init__()
-
-        assert image_channel is not None, f"[{self.__class__.__name__}] Please specify the number of input images' channels."
-        assert image_size is not None, f"[{self.__class__.__name__}] Please specify input images' size."
-        assert patch_size is not None, f"[{self.__class__.__name__}] Please specify patches' size."
-        assert len(num_layers_in_stages) == 4, f"[{self.__class__.__name__}] The number of stages should be 4, but got {len(num_layers_in_stages)}"
-        for num_layers in num_layers_in_stages:
-            assert num_layers % 2 == 0, f"[{self.__class__.__name__}] The number of layers in stages should be an even number, but got {num_layers}"
-
-        self.image_size = image_size
-        self.patch_size = patch_size
-        self.num_patches = (image_size // patch_size) ** 2
-        self.num_channels = num_channels
-        self.num_channels_after_patching = (patch_size**2) * image_channel
-
-        assert (
-            (self.num_patches**0.5) * patch_size == image_size
-        ), f"[{self.__class__.__name__}] Image size must be divided by the patch size."
-
-        self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
-
-
 class SwinTransformerBackbone(SwinTransformerBase):
     def __init__(
         self, 
@@ -364,18 +364,17 @@ class SwinTransformerBackbone(SwinTransformerBase):
         return nn.Identity() if stage_idx == 0 else PatchMerging(input_channel//2), block
 
 
-class SwinTransformerWithLinearClassifier(nn.Module):
-    def __init__(self, config: SwinTransformerConfig = None):
-        super().__init__()
+class SwinTransformerWithLinearClassifier(SwinTransformerBackbone):
+    def __init__(self, config: SwinTransformerConfig = None) -> None:
+        super().__init__(**config.__dict__)
 
-        self.backbone = SwinTransformerBackbone(**config.__dict__)
         self.proj_head = ProjectionHead(
-            config.dim,
+            self.num_channels * 2**(3),
             config.num_classes,
             config.pred_act_fnc_name,
         )
 
-    def forward(self, x, attention_mask=None):
-        x = self.backbone(x, attention_mask)
+    def forward(self, x: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
+        x = super().forward(x, attention_mask)
 
         return self.proj_head(x)

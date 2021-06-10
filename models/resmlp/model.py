@@ -73,7 +73,7 @@ class ResMLPBackBone(ViTBase):
             for idx in range(depth)
         ]))
 
-        self.pooler = Reduce("b n d -> b () d", "mean")
+        self.pooler = Reduce("b n d -> b d", "mean")
 
     def forward(self, x):
         # Divide into flattened patches)

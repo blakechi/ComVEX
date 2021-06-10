@@ -1,2 +1,2 @@
-from .model import WindowAttentionBase, WindowAttention, ShiftWindowAttention, SwinTransformerBase, SwinTransformerLayer, SwinTransformerBackbone, SwinTransformerWithLinearClassifier
+from .model import SwinTransformerBase, WindowAttentionBase, WindowAttention, ShiftWindowAttention, SwinTransformerLayer, SwinTransformerBackbone, SwinTransformerWithLinearClassifier
 from .config import SwinTransformerConfig

@@ -1,2 +1,2 @@
-from .model import MLPMixerLayer, MLPMixerBackBone, MLPMixer
+from .model import MLPMixerLayer, MLPMixerBackBone, MLPMixerWithLinearClassifier
 from .config import MLPMixerConfig

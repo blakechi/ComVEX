@@ -11,8 +11,17 @@ class TransUNetEncoderConvBlock(nn.Module):
         super().__init__()
 
         self.layers = nn.ModuleList([
-            ResNetFullPreActivationBottleneckBlock(in_channel, in_channel) if idx < (num_res_blocks - 1) else ResNetFullPreActivationBottleneckBlock(in_channel, out_channel, stride=2, padding=1)
-            for idx in range(num_res_blocks)
+            ResNetFullPreActivationBottleneckBlock(
+                in_channel, 
+                out_channel, 
+                out_channel, 
+                stride=2, 
+                padding=1
+            ) if idx == 0 else ResNetFullPreActivationBottleneckBlock(
+                out_channel, 
+                out_channel, 
+                out_channel
+            ) for idx in range(num_res_blocks)
         ])
 
     def forward(self, x):

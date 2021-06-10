@@ -2,10 +2,8 @@ from math import log
 import warnings
 
 import torch
-import torch.nn.functional as F
-from torch import nn, einsum
+from torch import nn
 from einops import rearrange, repeat
-from einops.layers.torch import Rearrange
 
 from models.utils import Residual, LayerNorm, FeedForward, MultiheadAttention
 
@@ -50,21 +48,20 @@ class PerceiverBlock(nn.Module):
         self.latent_transformers = nn.ModuleList([
             nn.ModuleList([
                 LayerNorm(
+                    fn=Residual(
+                        fn=MultiheadAttention(dim, heads=heads, **kwargs)
+                    ),
                     dim=dim,
                     use_pre_norm=pre_norm,
-                    fn=Residual(
-                        fn=MultiheadAttention(dim, heads, **kwargs)
-                    )
                 ),
                 LayerNorm(
-                    dim=dim,
-                    use_pre_norm=pre_norm,
                     fn=Residual(
                         fn=FeedForward(dim=dim, hidden_dim=ff_dim_scale*dim, **kwargs)
-                    )
+                    ),
+                    dim=dim,
+                    use_pre_norm=pre_norm,
                 )
-            ])
-            for _ in range(latent_transformer_depth)
+            ]) for _ in range(latent_transformer_depth)
         ])
             
     def forward(self, latent, byte, attention_mask=None):

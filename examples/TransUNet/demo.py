@@ -29,4 +29,4 @@ if __name__ == "__main__":
     x = torch.randn(1, 3, 224, 224)
 
     print("Input Shape:\n", x.shape)
-    print("Output Shape (remain the output size as the input):\n", transUnet(x).shape)
+    print("Output Shape:\n", transUnet(x).shape)

@@ -18,7 +18,7 @@ expected_shape = None
 
 # === Test Cases ===
 # Default test for the single model case
-def test_forward(input_shape=input_shape, expected_shape=expected_shape):
+def test_forward():
     model.eval()
 
     x = torch.randn(input_shape)
@@ -28,8 +28,9 @@ def test_forward(input_shape=input_shape, expected_shape=expected_shape):
     assert_output_has_nan(out)
 
 # Default test for specializations
-# def test_forward(input_shape=input_shape, expected_shape=expected_shape):
+# def test_forward():
 #     for spec in specializations:
+#         print(spec)
 #         config = getattr(__your_config_class_object__, spec)(__possible_args__)
 #         model = __your_class_object__(config)
 #         model.eval()

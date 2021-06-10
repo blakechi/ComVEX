@@ -1,7 +1,6 @@
 import torch
-import torch.nn.functional as F
-from torch import nn, einsum
-from einops import rearrange, repeat
+from torch import nn
+from einops import repeat
 
 from models.utils import Residual, LayerNorm, FeedForward, MultiheadAttention
 
@@ -20,7 +19,7 @@ class MAB(nn.Module):
             fn=Residual(
                 fn=MultiheadAttention(
                     dim,
-                    heads, 
+                    heads=heads, 
                     **kwargs
                 ),
             ),
@@ -55,7 +54,7 @@ class SAB(nn.Module):
             fn=Residual(
                 fn=MultiheadAttention(
                     dim,
-                    heads, 
+                    heads=heads, 
                     **kwargs
                 ),
             ),
