@@ -67,7 +67,7 @@ fnet_backbone = FNetBackbone(
 ```python
 from comvex.fnet import FNetConfig, FNetWithLinearClassifier
 
-fnet_config = gMLPConfig.FNet_B_12_512()
+fnet_config = FNetConfig.FNet_B_12_512()
 fnet = FNetWithLinearClassifier(fnet_config)
 ```
 
