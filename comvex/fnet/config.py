@@ -1,4 +1,7 @@
-class FNetConfig(object):
+from comvex.utils import ConfigBase
+
+
+class FNetConfig(ConfigBase):
     def __init__(
         self,
         image_size: int, 
@@ -9,6 +12,7 @@ class FNetConfig(object):
         num_classes: int,
         pred_act_fnc_name: str = "ReLU",
         dense_act_fnc_name: str = "ReLU",
+        ff_act_fnc_name: str = "ReLU",
         ff_dim: int = None,
         ff_dropout: float = 0.0,
         token_dropout: float = 0.0,
@@ -23,6 +27,7 @@ class FNetConfig(object):
         self.num_classes = num_classes 
         self.pred_act_fnc_name = pred_act_fnc_name
         self.dense_act_fnc_name = dense_act_fnc_name
+        self.ff_act_fnc_name = ff_act_fnc_name
         self.ff_dim = ff_dim
         self.ff_dropout = ff_dropout
         self.token_dropout = token_dropout

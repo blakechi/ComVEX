@@ -5,6 +5,7 @@ from torch import nn
 
 from comvex.utils.helpers import name_with_msg
 
+
 class SeperateConvXd(nn.Module):
     def __init__(
         self, 

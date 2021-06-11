@@ -1,4 +1,7 @@
-class MLPMixerConfig(object):
+from comvex.utils import ConfigBase
+
+
+class MLPMixerConfig(ConfigBase):
     def __init__(
         self, 
         *,

@@ -1,7 +1,9 @@
 from typing import Optional
 
+from comvex.utils import ConfigBase
 
-class ResNetConfig(object):
+
+class ResNetConfig(ConfigBase):
     def __init__(
         self, 
         num_input_channel: int,

@@ -1,4 +1,7 @@
-class ResMLPConfig(object):
+from comvex.utils import ConfigBase
+
+
+class ResMLPConfig(ConfigBase):
     def __init__(
         self,
         image_size: int, 

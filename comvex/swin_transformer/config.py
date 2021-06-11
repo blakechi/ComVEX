@@ -1,6 +1,9 @@
 from typing import List
 
-class SwinTransformerConfig(object):
+from comvex.utils import ConfigBase
+
+
+class SwinTransformerConfig(ConfigBase):
     def __init__(
         self, 
         image_channel: int, 

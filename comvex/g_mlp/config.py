@@ -1,4 +1,7 @@
-class gMLPConfig(object):
+from comvex.utils import ConfigBase
+
+
+class gMLPConfig(ConfigBase):
     def __init__(
         self,
         image_channel: int,

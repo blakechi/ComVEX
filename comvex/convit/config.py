@@ -1,4 +1,7 @@
-class ConViTConfig(object):
+from comvex.utils import ConfigBase
+
+
+class ConViTConfig(ConfigBase):
     def __init__(
         self,
         image_size: int, 
