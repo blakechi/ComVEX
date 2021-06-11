@@ -10,13 +10,13 @@ class FNetConfig(ConfigBase):
         dim: int,
         depth: int,
         num_classes: int,
-        pred_act_fnc_name: str = "ReLU",
-        dense_act_fnc_name: str = "ReLU",
-        ff_act_fnc_name: str = "ReLU",
+        pre_norm: bool = False,
         ff_dim: int = None,
         ff_dropout: float = 0.0,
         token_dropout: float = 0.0,
-        pre_norm: bool = False,
+        ff_act_fnc_name: str = "ReLU",
+        dense_act_fnc_name: str = "ReLU",
+        pred_act_fnc_name: str = "ReLU",
     ) -> None:
 
         self.image_size = image_size
@@ -25,13 +25,13 @@ class FNetConfig(ConfigBase):
         self.dim = dim
         self.depth = depth
         self.num_classes = num_classes 
-        self.pred_act_fnc_name = pred_act_fnc_name
-        self.dense_act_fnc_name = dense_act_fnc_name
-        self.ff_act_fnc_name = ff_act_fnc_name
+        self.pre_norm = pre_norm
         self.ff_dim = ff_dim
         self.ff_dropout = ff_dropout
         self.token_dropout = token_dropout
-        self.pre_norm = pre_norm
+        self.ff_act_fnc_name = ff_act_fnc_name
+        self.dense_act_fnc_name = dense_act_fnc_name
+        self.pred_act_fnc_name = pred_act_fnc_name
 
     @classmethod
     def FNet_L_24(cls, num_classes, **kwargs):
@@ -69,5 +69,70 @@ class FNetConfig(ConfigBase):
             12,
             num_classes=num_classes,
             ff_dim=2048,
+            **kwargs
+        )
+
+    @classmethod
+    def FNet_B_8_512(cls, num_classes, **kwargs):
+        return cls(
+            224,
+            3,
+            16,
+            512,
+            8,
+            num_classes=num_classes,
+            ff_dim=2048,
+            **kwargs
+        )
+        
+    @classmethod
+    def FNet_Mini_4_512(cls, num_classes, **kwargs):
+        return cls(
+            224,
+            3,
+            16,
+            512,
+            4,
+            num_classes=num_classes,
+            ff_dim=2048,
+            **kwargs
+        )
+
+    @classmethod
+    def FNet_Mini_4_256(cls, num_classes, **kwargs):
+        return cls(
+            224,
+            3,
+            16,
+            256,
+            4,
+            num_classes=num_classes,
+            ff_dim=1024,
+            **kwargs
+        )
+
+    @classmethod
+    def FNet_Micro_2_256(cls, num_classes, **kwargs):
+        return cls(
+            224,
+            3,
+            16,
+            256,
+            2,
+            num_classes=num_classes,
+            ff_dim=1024,
+            **kwargs
+        )
+
+    @classmethod
+    def FNet_Micro_2_128(cls, num_classes, **kwargs):
+        return cls(
+            224,
+            3,
+            16,
+            128,
+            2,
+            num_classes=num_classes,
+            ff_dim=512,
             **kwargs
         )

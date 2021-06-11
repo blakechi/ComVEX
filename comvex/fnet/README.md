@@ -12,26 +12,33 @@ This is an PyTorch implementation of [FNet: Mixing Tokens with Fourier Transform
    - `FNet_L_24`
    - `FNet_B_12_768`
    - `FNet_B_12_512`
+   - `FNet_B_8_512`
+   - `FNet_Mini_4_512`
+   - `FNet_Mini_4_256`
+   - `FNet_Micro_2_256`
+   - `FNet_Micro_2_128`
 
 ## Usage
 
 1. FNet Configuration
 
 ```python
-from comvex.fnet import gMLPConfig
+from comvex.fnet import FNetConfig
 
-fnet_config = gMLPConfig(
-    image_channel=3,           # The number of image channels
-    image_size=224,            # Image size
-    patch_size=16,             # Patch size
-    depth=30,                  # Number of layers
-    ffn_dim=128,               # Token dimension
-    num_classes=1000,          # The number of classes for classification
-    pred_act_fnc_name="ReLU"   # The activation function for the projection head
-    attention_dim=None,        # The dimension for the blended attention. `None` means don't use it.
-    attention_dropout=0.0,     # Dropout rate for the attention maps
-    token_dropout=0.0,         # Dropout rate for the tokens
-    ff_dropout=0.1,            # Dropout rate for all feed forwarded networks
+fnet_config = FNetConfig(
+    image_size=224,             # Image size
+    image_channel=3,            # Number of input image channels
+    patch_size=16,              # Patch size
+    dim=512,                    # The token dimension
+    depth=12,                   # Number of encoder layers
+    num_classes=1000,           # Number of the categories
+    pre_norm=False,             # Whether to normalize before `fourier_block` and `ff_block`
+    ff_dim=2048,                # Feed forward layers' expanding dimention
+    ff_dropout=0.0,             # Feed forward layers' dropout rate
+    token_dropout=0.0,          # Token dropout rate
+    ff_act_fnc_name="ReLU",     # Activation function for the feed forward layers in the encoder layers
+    dense_act_fnc_name="ReLU",  # Activation function for the `Dense` layer from the official paper
+    pred_act_fnc_name="ReLU"    # Activation function for the projection head from the official paper
 )
 ```
 
@@ -41,13 +48,17 @@ fnet_config = gMLPConfig(
 from comvex.fnet import FNetBackbone
 
 fnet_backbone = FNetBackbone(
-    3,                     # The number of image channels
-    224,                   # Image size
-    16,                    # Patch size
-    depth=12,              # Number of layers
-    token_mlp_dim=384,     # The dimension of the token mixer
-    channel_mlp_dim=3072,  # The dimension of the channel mixer
-    ff_dropout=0.1,        # The dropout rate for all feed forwarded networks
+    image_size=224,             # Image size
+    image_channel=3,            # Number of input image channels
+    patch_size=16,              # Patch size
+    dim=512,                    # The token dimension
+    depth=12,                   # Number of encoder layers
+    pre_norm=False,             # Whether to normalize before `fourier_block` and `ff_block`
+    ff_dim=2048,                # Feed forward layers' expanding dimention
+    ff_dropout=0.0,             # Feed forward layers' dropout rate
+    token_dropout=0.0,          # Token dropout rate
+    ff_act_fnc_name="ReLU",     # Activation function for the feed forward layers in the encoder layers
+    dense_act_fnc_name="ReLU",  # Activation function for the `Dense` layer from the official paper
 )
 ```
 
