@@ -95,8 +95,7 @@ class WindowAttentionBase(nn.Module):
     def _init_weights(self, m):
         if isinstance(m, nn.Parameter):
             # Reference from: https://github.com/microsoft/Swin-Transformer/blob/main/models/swin_transformer.py#L110
-            # nn.init.trunc_normal_(m, std=0.02)
-            nn.init.kaiming_normal_(m.weight)
+            nn.init.trunc_normal_(m.weight, std=0.02)
 
 
 class PatchMerging(nn.Module):
