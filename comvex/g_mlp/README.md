@@ -4,15 +4,15 @@ This is an PyTorch implementation of [Pay Attention to MLPs](https://arxiv.org/a
 
 ## Objects
 
-1. gMLPBase
-2. SpatialGatingUnit
-3. gMLPBlock
-4. gMLPBackbone
-5. gMLPWithLinearClassifier
-6. gMLPConfig
-   - gMLP_Ti
-   - gMLP_S
-   - gMLP_B
+1. `gMLPBase`
+2. `SpatialGatingUnit`
+3. `gMLPBlock`
+4. `gMLPBackbone`
+5. `gMLPWithLinearClassifier`
+6. `gMLPConfig`
+   - `gMLP_Ti`
+   - `gMLP_S`
+   - `gMLP_B`
 
 ## Usage
 
