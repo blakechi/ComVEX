@@ -1,12 +1,12 @@
-from comvex.utils.dropout import TokenDropout
 import torch
 from torch import nn, einsum
 from einops import rearrange, repeat
 
 from comvex.vit import ViTBase
 from comvex.transformer import TransformerEncoderLayer
-from comvex.utils import Residual, LayerNorm, FeedForward, ProjectionHead, TokenWiseDropout
-from comvex.convit.config import ConViTConfig
+from comvex.utils import Residual, LayerNorm, FeedForward, ProjectionHead, TokenDropout
+from comvex.utils.helpers.functions import config_pop_argument, name_with_msg
+from .config import ConViTConfig
 
 
 class GatedPositionalSelfAttention(nn.Module):
@@ -25,14 +25,18 @@ class GatedPositionalSelfAttention(nn.Module):
 
         assert (
             heads is not None or head_dim is not None
-        ), f"[{self.__class__.__name__}] Either `heads` or `head_dim` must be specified."
+        ), name_with_msg(self, "Either `heads` or `head_dim` must be specified.")
 
         self.heads = heads if heads is not None else dim // head_dim
         head_dim = head_dim if head_dim is not None else dim // heads
 
         assert (
             head_dim * heads == dim
-        ), f"[{self.__class__.__name__}] Head dimension times the number of heads must be equal to embedding dimension `dim`"
+        ), name_with_msg(self, "Head dimension times the number of heads must be equal to embedding dimension `dim`")
+
+        assert (
+            num_patches is not None
+        ), name_with_msg(self, "`num_patches should be defined at the initialization stage.")
 
         self.Q = nn.Linear(dim, dim, bias=False)
         self.K = nn.Linear(dim, dim, bias=False)
@@ -146,23 +150,29 @@ class ConViTLayer(nn.Module):
         return self.ff_block(x)
 
 
-class ConViTBackbone(nn.Module):
+class ConViTBackbone(ViTBase):
     def __init__(
         self,
+        image_size,
+        image_channel,
+        patch_size,
         num_local_layers,
         num_nonlocal_layers,
-        num_patches,
         dim,
         heads=None,
         head_dim=None,
         locality_strength=None,
         pre_norm=False,
         ff_dim=None,                    # If not specify, ff_dim = 4*dim
-        ff_dropout=0.0,
-        attention_dropout=0.0,
-        **kwargs
+        ff_dropout=0.,
+        attention_dropout=0.,
+        token_dropout=0.
     ):
-        super().__init__()
+        super().__init__(image_size, image_channel, patch_size)
+
+        self.linear_proj = nn.Linear(self.patch_dim, dim, bias=False)
+        self.CLS = nn.Parameter(torch.randn(1, 1, dim), requires_grad=True)
+        self.token_dropout = TokenDropout(token_dropout)
 
         self.local_layers = nn.Sequential(*[
             ConViTLayer(
@@ -170,7 +180,7 @@ class ConViTBackbone(nn.Module):
                 heads=heads,
                 head_dim=head_dim,
                 locality_strength=locality_strength,
-                num_patches=num_patches, 
+                num_patches=self.num_patches, 
                 attention_dropout=attention_dropout, 
                 pre_norm=pre_norm, 
                 ff_dim=ff_dim, 
@@ -190,35 +200,6 @@ class ConViTBackbone(nn.Module):
             ) for _ in range(num_nonlocal_layers)
         ])
 
-    def forward(self, x, cls_token):
-        b, n, d = x.shape
-
-        x = self.local_layers(x)
-
-        # Prepend CLS token and add position code
-        cls_token = repeat(cls_token, "1 1 d -> b 1 d", b=b)
-        x = torch.cat([cls_token, x], dim=1)
-
-        return self.nonlocal_layers(x)
-
-
-class ConViTWithLinearClassifier(ViTBase):
-    def __init__(self, config: ConViTConfig = None):
-        super().__init__(config.image_size, config.image_channel, config.patch_size)
-
-        self.linear_proj = nn.Linear(self.patch_dim, config.dim, bias=False)
-        self.CLS = nn.Parameter(torch.randn(1, 1, config.dim), requires_grad=True)
-        self.token_dropout = TokenDropout(config.token_dropout)
-        # self.token_dropout = TokenWiseDropout(config.token_dropout)
-
-        self.backbone = ConViTBackbone(num_patches=self.num_patches, **config.__dict__)
-
-        self.proj_head = ProjectionHead(
-            config.dim,
-            config.num_classes,
-            config.pred_act_fnc_name,
-        )
-
     def forward(self, x):
         b, _, _, _ = x.shape  # b, c, h, w = x.shape
 
@@ -226,6 +207,28 @@ class ConViTWithLinearClassifier(ViTBase):
         x = self.linear_proj(x)
         x = self.token_dropout(x)
 
-        x = self.backbone(x, self.CLS)
+        x = self.local_layers(x)
+
+        # Prepend CLS token and add position code
+        cls_token = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
+        x = torch.cat([cls_token, x], dim=1)
+
+        return self.nonlocal_layers(x)
+
+
+class ConViTWithLinearClassifier(ConViTBackbone):
+    def __init__(self, config: ConViTConfig = None):
+        num_classes = config_pop_argument(config, "num_classes")
+        pred_act_fnc_name = config_pop_argument(config, "pred_act_fnc_name")
+        super().__init__(**config.__dict__)
+
+        self.proj_head = ProjectionHead(
+            config.dim,
+            num_classes,
+            pred_act_fnc_name,
+        )
+
+    def forward(self, x):
+        x = super().forward(x)
 
         return self.proj_head(x[:, 0, :])
