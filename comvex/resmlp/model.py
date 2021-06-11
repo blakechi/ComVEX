@@ -3,9 +3,10 @@ import torch
 from torch import nn
 from einops.layers.torch import Rearrange, Reduce
 
-from .config import ResMLPConfig
 from comvex.vit import ViTBase
-from comvex.utils import MLP, AffineTransform, PathDropout, LayerScaleBlock, TokenWiseDropout
+from comvex.utils import MLP, AffineTransform, LayerScaleBlock, TokenDropout, PathDropout
+from comvex.utils.helpers import config_pop_argument
+from .config import ResMLPConfig
 
 
 class ResMLPLayer(nn.Module):
@@ -55,12 +56,11 @@ class ResMLPBackBone(ViTBase):
         path_dropout=0., 
         token_dropout=0.,
         ff_dropout=0.,
-        **kwargs
     ):
         super().__init__(image_size, image_channel, patch_size)
 
         self.linear_proj = nn.Linear(self.patch_dim, dim, bias=False)
-        self.token_dropout = TokenWiseDropout(token_dropout)
+        self.token_dropout = TokenDropout(token_dropout)
 
         self.encoder = nn.Sequential(OrderedDict([
             (f"layer_{idx}", ResMLPLayer(
@@ -102,9 +102,10 @@ class ResMLPBackBone(ViTBase):
         
 class ResMLPWithLinearClassifier(ResMLPBackBone):
     def __init__(self, config: ResMLPConfig = None) -> None:
+        num_classes = config_pop_argument(config, "num_classes")
         super().__init__(**config.__dict__)
 
-        self.proj_head = nn.LazyLinear(config.num_classes)
+        self.proj_head = nn.LazyLinear(num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = super().forward(x)

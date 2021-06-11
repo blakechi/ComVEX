@@ -4,7 +4,59 @@ This is an PyTorch implementation of [ResMLP: Feedforward networks for image cla
 
 ## Objects
 
+1. `ResMLPLayer`
+2. `ResMLPBackBone`
+3. `ResMLPWithLinearClassifier`
+4. `ResMLPConfig`
+   - `ResMLP_12`
+   - `ResMLP_24`
+   - `ResMLP_36`
+
 ## Usage
+
+1. ResMLP Configuration
+
+```python
+from comvex.resmlp import ResMLPConfig
+
+resmlp_config = ResMLPConfig(
+    image_size=224,             # Image size
+    image_channel=3,            # Number of input image channels
+    patch_size=16,              # Patch size
+    depth=12,                   # Number of layers
+    dim=384,                    # The token dimension
+    num_classes=1000,           # Number of categories
+    path_dropout=0.,            # Path dropout rate
+    token_dropout=0.,           # Token dropout rate
+    ff_dropout=0.,              # Feed forward layers' dropout rate
+)
+```
+
+2. ResMLP Backbone
+
+```python
+from comvex.resmlp import ResMLPBackbone
+
+resmlp_backbone = ResMLPBackbone(
+    image_size=224,             # Image size
+    image_channel=3,            # Number of input image channels
+    patch_size=16,              # Patch size
+    depth=12,                   # Number of layers
+    dim=384,                    # The token dimension
+    path_dropout=0.,            # Path dropout rate
+    token_dropout=0.,           # Token dropout rate
+    ff_dropout=0.,              # Feed forward layers' dropout rate
+)
+```
+
+3. Specifications of the ResMLP architectures
+
+```python
+from comvex.resmlp import ResMLPConfig, ResMLPWithLinearClassifier
+
+resmlp_config = ResMLPConfig.ResMLP_12()
+resmlp = ResMLPWithLinearClassifier(resmlp_config)
+```
 
 ## Demo
 
