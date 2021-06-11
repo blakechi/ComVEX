@@ -159,9 +159,9 @@ class ConViTBackbone(ViTBase):
         num_local_layers,
         num_nonlocal_layers,
         dim,
+        locality_strength=None,
         heads=None,
         head_dim=None,
-        locality_strength=None,
         pre_norm=False,
         ff_dim=None,                    # If not specify, ff_dim = 4*dim
         ff_dropout=0.,
