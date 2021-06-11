@@ -30,7 +30,7 @@ root = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(root, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-with open(os.path.join(root, 'version.txt', 'r')) as f:
+with open(os.path.join(root, 'version.txt'), 'r') as f:
     version = f.read().strip()
 
 setup(
