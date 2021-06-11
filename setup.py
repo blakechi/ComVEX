@@ -20,6 +20,7 @@ if sys.version_info < python_min_version:
     ))
     sys.exit(-1)
 
+
 # Set up
 import os
 from setuptools import setup, find_packages
@@ -29,9 +30,12 @@ root = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(root, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+with open(os.path.join(root, 'version.txt', 'r') as f:
+    version = f.read().strip()
+
 setup(
     name='comvex',
-    version='0.0.1',
+    version=version,
     keywords='pytorch einops computer-vision',
     description='Implementations of Recent Papers in Computer Vision',
     long_description=long_description,
