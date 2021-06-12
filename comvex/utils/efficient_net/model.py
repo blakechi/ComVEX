@@ -45,16 +45,16 @@ class SeperateConvXd(nn.Module):
             kernel_size=1,
         )
 
-        if norm_layer:
-            self.norm_0 = getattr(norm_layer)(in_channel*kernels_per_layer, **kwargs) if hasattr(nn, norm_layer) else None
-            self.norm_1 = getattr(norm_layer)(in_channel*kernels_per_layer, **kwargs) if hasattr(nn, norm_layer) else None
-        else:
-            self.norm_0, self.norm_1 = None, None
+        self.norm_0 = getattr(nn, norm_layer)(
+            in_channel*kernels_per_layer,
+            **kwargs
+        ) if norm_layer and hasattr(nn, norm_layer) else None
+        self.norm_1 = getattr(nn, norm_layer)(
+            in_channel*kernels_per_layer,
+            **kwargs
+        ) if norm_layer and hasattr(nn, norm_layer) else None
             
-        if act_fnc:
-            self.act_fnc = getattr(nn, act_fnc) if hasattr(nn, act_fnc) else None
-        else:
-            self.act_fnc = None
+        self.act_fnc = getattr(nn, act_fnc)() if act_fnc and hasattr(nn, act_fnc) else None
 
     def forward(self, x):
         x = self.depth_wise_conv(x)
