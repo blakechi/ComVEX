@@ -1,5 +1,7 @@
 # ComVEX: Computer Vision EXpo
 
+[![PyPI version](https://img.shields.io/pypi/v/comvex?color=blue)](https://pypi.org/project/comvex/)
+
 Hi there! This is a reimplementation library for computer vision models by **PyTorch** and **Einops**. Our mission is to bridge papers and codes with consistent and clear implementations.
 
 ## What are the pros?
