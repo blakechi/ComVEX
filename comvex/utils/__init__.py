@@ -1,6 +1,7 @@
 from .base_block import Residual, LayerNorm, MaskLayerNorm, FeedForward, ProjectionHead, MLP
 from .config_base import ConfigBase
 from .dropout import TokenWiseDropout, TokenDropout, PathDropout
+from .efficientnet import SeperateConvXd, MBConvXd
 from .layer_scale import AffineTransform, LayerScaleBlock
 from .multihead_attention import MultiheadAttention
 from .resnet import ResNetBlockBase, ResNetBlock, ResNetBottleneckBlock, ResNetFullPreActivationBlock, ResNetFullPreActivationBottleneckBlock, ResNetBackBone, ResNetWithLinearClassifier, ResNetConfig
@@ -12,6 +13,7 @@ __all__ = [
     "Residual", "LayerNorm", "MaskLayerNorm", "FeedForward", "ProjectionHead", "MLP",
     "ConfigBase",
     "TokenWiseDropout", "TokenDropout", "PathDropout",
+    "SeperateConvXd", "MBConvXd",
     "AffineTransform", "LayerScaleBlock",
     "MultiheadAttention",
     "ResNetBlockBase", "ResNetBlock", "ResNetBottleneckBlock", "ResNetFullPreActivationBlock", "ResNetFullPreActivationBottleneckBlock", "ResNetBackBone", "ResNetWithLinearClassifier", "ResNetConfig",

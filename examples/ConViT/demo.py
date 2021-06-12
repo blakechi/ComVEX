@@ -2,6 +2,8 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 
+import torch 
+
 from comvex.convit import ConViTConfig, ConViTWithLinearClassifier
 
 
