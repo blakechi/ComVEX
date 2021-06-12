@@ -35,6 +35,16 @@ Hi there! This is a reimplementation library for computer vision models by **PyT
 6. Detailed Model Information \
    Every models has its own `README.md` file that provides usages, one-by-one argument explanations, and usable objects. The official implementations are provided as well if any mentioned in the official paper.
 
+## How to install?
+
+```console
+pip3 install comvex
+```
+
+## How to use?
+
+Please check out the usage detailed in models' own `README.md`s.
+
 ## Notes
 
 - Continuously implementing models, please check them out under the `comvex` folder for more details and `examples` folder for some demos.
