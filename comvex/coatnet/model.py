@@ -5,7 +5,7 @@ from torch import nn, einsum
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange, Reduce
 
-from comvex.utils import MBConvXd, MultiheadAttention, FeedForward, PathDropout, ProjectionHead
+from comvex.utils import MBConvXd, MultiheadAttention, PathDropout, ProjectionHead
 from comvex.utils.helpers import name_with_msg, config_pop_argument
 from .config import CoAtNetConfig
 
@@ -27,7 +27,7 @@ class CoAtNetRelativeAttention(MultiheadAttention):
         self.pre_width = pre_width
 
         self.relative_bias = nn.Parameter(
-            torch.randn(heads, int(4*(pre_height - 1)*(pre_width - 1))),
+            torch.randn(heads, int((2*pre_height - 1)*(2*pre_width - 1))),
             requires_grad=True
         )
         self.register_buffer("relative_indices", self._get_relative_indices(pre_height, pre_width))
@@ -49,7 +49,7 @@ class CoAtNetRelativeAttention(MultiheadAttention):
             relative_bias = self._interpolate_relative_bias(H, W)
 
         relative_indices = repeat(relative_indices, "n m -> b h n m", b=b, h=h)
-        relative_bias = repeat(relative_bias, "h m -> b h n m", b=b, n=H*W)
+        relative_bias = repeat(relative_bias, "h r -> b h n r", b=b, n=H*W)  # r: number of relative biases, (2*H - 1)*(2*W - 1)
         relative_biases = relative_bias.gather(dim=-1, index=relative_indices)
 
         # similarity
@@ -89,8 +89,8 @@ class CoAtNetRelativeAttention(MultiheadAttention):
         return out.to(torch.long)
 
     def _interpolate_relative_bias(self, height: int, width: int) -> torch.Tensor:
-        out = rearrange(self.relative_bias, "h (n m) -> 1 h n m", n=2*self.pre_height - 1)
-        out = nn.functional.interpolate(out, size=(height, width), mode="bilinear")
+        out = rearrange(self.relative_bias, "h (n m) -> 1 h n m", n=(2*self.pre_height - 1))
+        out = nn.functional.interpolate(out, size=(2*height - 1, 2*width - 1), mode="bilinear", align_corners=True)
 
         return rearrange(out, "1 h n m -> h (n m)")
 
@@ -130,7 +130,7 @@ class CoAtNetTransformerBlock(nn.Module):
             **kwargs
         )
         self.attention_path_dropout = PathDropout(path_dropout)
-        self.pool = nn.AdaptiveMaxPool2d((input_height, input_width)) if use_downsampling else nn.Identity()
+        self.pool = nn.MaxPool2d((2, 2)) if use_downsampling else nn.Identity()
         self.skip = nn.Conv2d(in_dim, out_dim, kernel_size=1) if use_downsampling else nn.Identity()
 
         self.ff_block = nn.Sequential(
@@ -172,7 +172,7 @@ class CoAtNetConvBlock(nn.Module):
         self.path_dropout = PathDropout(kwargs["path_dropout"] if "path_dropout" in kwargs else 0.)
 
         self.skip = nn.Sequential(
-            nn.AdaptiveMaxPool2d((input_height, input_width)),
+            nn.MaxPool2d((2, 2)),
             nn.Conv2d(in_dim, out_dim, kernel_size=1)
         ) if use_downsampling else nn.Identity()
 
