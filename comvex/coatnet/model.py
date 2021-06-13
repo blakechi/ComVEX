@@ -10,6 +10,43 @@ from comvex.utils.helpers import name_with_msg, config_pop_argument
 from .config import CoAtNetConfig
 
 
+class CoAtNetBase(nn.Module):
+    def __init__(self, image_height, image_width, num_blocks_in_layers, num_channels_in_layers, block_type_in_layers, expand_scale_in_layers):
+        super().__init__()
+
+        assert (
+            len(num_blocks_in_layers) == 5
+        ), name_with_msg(self, "The length of `num_blocks_in_layers` must be 5")
+
+        if isinstance(num_channels_in_layers, list):
+            assert (
+                len(num_channels_in_layers) == 5
+            ), name_with_msg(self, "The length of `num_channels_in_layers` must be 5")
+        else:
+            begin_channel = int(num_channels_in_layers)
+            num_channels_in_layers = [int(begin_channel // (2**layer_idx)) for layer_idx in range(0, 5)]
+
+        # We ignore `S0` here, so the length of the below lists should be 4
+        assert (
+            len(block_type_in_layers) == 4
+        ), name_with_msg(self, "The length of `block_type_in_layers` must be 4")
+
+        if isinstance(expand_scale_in_layers, list):
+            assert (
+                len(expand_scale_in_layers) == 4
+            ), name_with_msg(self, "The length of `expand_scale_in_layers` must be 4")
+        else:
+            expand_scale = int(expand_scale_in_layers)
+            expand_scale_in_layers = [expand_scale for _ in range(4)]
+
+        self.height_in_layers = [int(image_height / (2**layer_idx)) for layer_idx in range(1, 6)]
+        self.width_in_layers = [int(image_width / (2**layer_idx)) for layer_idx in range(1, 6)]
+        self.num_blocks_in_layers = num_blocks_in_layers
+        self.num_channels_in_layers = num_channels_in_layers
+        self.block_type_in_layers = block_type_in_layers
+        self.expand_scale_in_layers = expand_scale_in_layers
+
+
 class CoAtNetRelativeAttention(MultiheadAttention):
     def __init__(
         self,
@@ -94,7 +131,7 @@ class CoAtNetRelativeAttention(MultiheadAttention):
 
         return rearrange(out, "1 h n m -> h (n m)")
 
-    def _update_relative_bias_and_indices(self, height: int, width: int) -> None:
+    def update_relative_bias_and_indices(self, height: int, width: int) -> None:
         r"""
         For possible input's height or width changes in inference.
         """
@@ -183,7 +220,7 @@ class CoAtNetConvBlock(nn.Module):
         return x
 
 
-class CoAtNetBackbone(nn.Module):
+class CoAtNetBackbone(CoAtNetBase):
     def __init__(
         self,
         image_height: int,
@@ -198,35 +235,14 @@ class CoAtNetBackbone(nn.Module):
         attention_dropout: float = 0.,
         path_dropout: float = 0.,
     ) -> None:
-        super().__init__()
-
-        assert (
-            len(num_blocks_in_layers) == 5
-        ), name_with_msg(self, "The length of `num_blocks_in_layers` must be 5")
-
-        if isinstance(num_channels_in_layers, list):
-            assert (
-                len(num_channels_in_layers) == 5
-            ), name_with_msg(self, "The length of `num_channels_in_layers` must be 5")
-        else:
-            begin_channel = int(num_channels_in_layers)
-            num_channels_in_layers = [int(begin_channel // (2**layer_idx)) for layer_idx in range(0, 5)]
-
-        # We ignore `S0` here, so the length of the below lists should be 4
-        assert (
-            len(block_type_in_layers) == 4
-        ), name_with_msg(self, "The length of `block_type_in_layers` must be 4")
-
-        if isinstance(expand_scale_in_layers, list):
-            assert (
-                len(expand_scale_in_layers) == 4
-            ), name_with_msg(self, "The length of `expand_scale_in_layers` must be 4")
-        else:
-            expand_scale = int(expand_scale_in_layers)
-            expand_scale_in_layers = [expand_scale for _ in range(4)]
-
-        height_in_layers = [int(image_height / (2**layer_idx)) for layer_idx in range(1, 6)]
-        width_in_layers = [int(image_width / (2**layer_idx)) for layer_idx in range(1, 6)]
+        super().__init__(
+            image_height,
+            image_width,
+            num_blocks_in_layers,
+            num_channels_in_layers,
+            block_type_in_layers,
+            expand_scale_in_layers
+        )
 
         kwargs = {}
         kwargs["heads"] = heads
@@ -238,39 +254,39 @@ class CoAtNetBackbone(nn.Module):
         self.s_0 = nn.Sequential(*[
             nn.Conv2d(
                 image_channel,
-                num_channels_in_layers[0],
+                self.num_channels_in_layers[0],
                 kernel_size=3,
                 stride=2,
                 padding=1
             ) if idx == 0 else nn.Conv2d(
-                num_channels_in_layers[0],
-                num_channels_in_layers[0],
+                self.num_channels_in_layers[0],
+                self.num_channels_in_layers[0],
                 kernel_size=3,
                 padding=1
-            ) for idx in range(num_blocks_in_layers[0])
+            ) for idx in range(self.num_blocks_in_layers[0])
         ])
         self.s_1 = self._build_layer("s_1",                                                   # layer name
-            height_in_layers[1], width_in_layers[1],                                          # input size
-            num_channels_in_layers[0], num_channels_in_layers[1], expand_scale_in_layers[0],  # dimension-related
-            num_blocks_in_layers[1], block_type_in_layers[0],                                 # block-related
+            self.height_in_layers[1], self.width_in_layers[1],                                          # input size
+            self.num_channels_in_layers[0], self.num_channels_in_layers[1], self.expand_scale_in_layers[0],  # dimension-related
+            self.num_blocks_in_layers[1], self.block_type_in_layers[0],                                 # block-related
             **kwargs
         )
         self.s_2 = self._build_layer("s_2",                                                   # layer name
-            height_in_layers[2], width_in_layers[2],                                          # input size
-            num_channels_in_layers[1], num_channels_in_layers[2], expand_scale_in_layers[1],  # dimension-related
-            num_blocks_in_layers[2], block_type_in_layers[1],                                 # block-related
+            self.height_in_layers[2], self.width_in_layers[2],                                          # input size
+            self.num_channels_in_layers[1], self.num_channels_in_layers[2], self.expand_scale_in_layers[1],  # dimension-related
+            self.num_blocks_in_layers[2], self.block_type_in_layers[1],                                 # block-related
             **kwargs
         )
         self.s_3 = self._build_layer("s_3",                                                   # layer name
-            height_in_layers[3], width_in_layers[3],                                          # input size
-            num_channels_in_layers[2], num_channels_in_layers[3], expand_scale_in_layers[2],  # dimension-related
-            num_blocks_in_layers[3], block_type_in_layers[2],                                 # block-related
+            self.height_in_layers[3], self.width_in_layers[3],                                          # input size
+            self.num_channels_in_layers[2], self.num_channels_in_layers[3], self.expand_scale_in_layers[2],  # dimension-related
+            self.num_blocks_in_layers[3], self.block_type_in_layers[2],                                 # block-related
             **kwargs
         )
         self.s_4 = self._build_layer("s_4",                                                   # layer name
-            height_in_layers[4], width_in_layers[4],                                          # input size
-            num_channels_in_layers[3], num_channels_in_layers[4], expand_scale_in_layers[3],  # dimension-related
-            num_blocks_in_layers[4], block_type_in_layers[3],                                 # block-related
+            self.height_in_layers[4], self.width_in_layers[4],                                          # input size
+            self.num_channels_in_layers[3], self.num_channels_in_layers[4], self.expand_scale_in_layers[3],  # dimension-related
+            self.num_blocks_in_layers[4], self.block_type_in_layers[3],                                 # block-related
             **kwargs
         )
 

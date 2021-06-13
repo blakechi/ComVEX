@@ -1,7 +1,6 @@
 import os
 import sys
 
-from comvex import coatnet
 sys.path.insert(0, os.getcwd())
 
 import torch 
