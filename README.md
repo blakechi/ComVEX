@@ -2,7 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/comvex?color=blue)](https://pypi.org/project/comvex/) ![Package Status](https://img.shields.io/pypi/status/comvex) ![Models' Testing](https://img.shields.io/github/workflow/status/blakechi/ComVEX/ComVEX%20Testing)
 
-Hi there! This is a reimplementation library for computer vision models by **PyTorch** and **Einops**. Our mission is to bridge papers and codes with consistent and clear implementations.
+Hi there! This is a reimplementation library for computer vision models by [**PyTorch**](https://github.com/pytorch/pytorch) and [**Einops**](https://github.com/arogozhnikov/einops). Our mission is to bridge papers and codes with consistent and clear implementations.
 
 ## What are the pros?
 
