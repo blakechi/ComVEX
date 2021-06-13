@@ -8,6 +8,7 @@ from comvex.coatnet import CoAtNetConfig, CoAtNetWithLinearClassifier
 # === Instantiate your Model ===
 # - For specializations
 specializations = [attr for attr in dir(CoAtNetConfig) if attr.startswith("CoAtNet")]
+specializations = specializations[:2]  # Avoid too large specializations
 
 # === Settings ===
 # - Required:
