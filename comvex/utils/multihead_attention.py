@@ -11,7 +11,8 @@ class MultiheadAttention(nn.Module):
         heads=None, 
         kv_dim=None, 
         head_dim=None, 
-        proj_dim=None, 
+        proj_dim=None,
+        out_dim=None,
         attention_dropout=0.0, 
         ff_dropout=0.0, 
         dtype=torch.float32, 
@@ -20,6 +21,7 @@ class MultiheadAttention(nn.Module):
         super().__init__()
 
         dim = proj_dim if proj_dim is not None else in_dim
+        out_dim = out_dim if out_dim is not None else in_dim
 
         assert (
             heads is not None or head_dim is not None
@@ -35,7 +37,7 @@ class MultiheadAttention(nn.Module):
         self.Q = nn.Linear(in_dim, dim, bias=False)
         self.K = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=False)
         self.V = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=False)
-        self.out_linear = nn.Linear(dim, in_dim)
+        self.out_linear = nn.Linear(dim, out_dim)
 
         # Reference from`BertSelfAttention` (https://huggingface.co/transformers/_modules/transformers/models/bert/modeling_bert.html#BertModel)
         self.attention_dropout = nn.Dropout2d(attention_dropout)
