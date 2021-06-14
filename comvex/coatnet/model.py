@@ -54,17 +54,17 @@ class CoAtNetRelativeAttention(MultiheadAttention):
         pre_width: int,
         in_dim: int,
         proj_dim: int,
-        heads: int,
+        head_dim: int,
         attention_dropout: float = 0.,
         ff_dropout: float = 0.,
     ) -> None:
-        super().__init__(in_dim, proj_dim=proj_dim, out_dim=proj_dim, heads=heads, attention_dropout=attention_dropout, ff_dropout=ff_dropout)
+        super().__init__(in_dim, proj_dim=proj_dim, out_dim=proj_dim, head_dim=head_dim, attention_dropout=attention_dropout, ff_dropout=ff_dropout)
 
         self.pre_height = pre_height
         self.pre_width = pre_width
 
         self.relative_bias = nn.Parameter(
-            torch.randn(heads, int((2*pre_height - 1)*(2*pre_width - 1))),
+            torch.randn(self.heads, int((2*pre_height - 1)*(2*pre_width - 1))),
             requires_grad=True
         )
         self.register_buffer("relative_indices", self._get_relative_indices(pre_height, pre_width))
@@ -230,7 +230,7 @@ class CoAtNetBackbone(CoAtNetBase):
         block_type_in_layers: List[int],
         num_channels_in_layers: Union[List[int], int],
         expand_scale_in_layers: Union[List[int], int],
-        heads: int = 32,
+        head_dim: int = 32,
         ff_dropout: float = 0.,
         attention_dropout: float = 0.,
         path_dropout: float = 0.,
@@ -245,7 +245,7 @@ class CoAtNetBackbone(CoAtNetBase):
         )
 
         kwargs = {}
-        kwargs["heads"] = heads
+        kwargs["head_dim"] = head_dim
         kwargs["ff_dropout"] = ff_dropout
         kwargs["attention_dropout"] = attention_dropout
         kwargs["path_dropout"] = path_dropout
