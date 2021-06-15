@@ -1,36 +1,36 @@
+import gc
 import torch
 from .utils import *
 
 # === Import model-related objects ===
-from comvex.vit import ViT
+from comvex.vit import ViTConfig, ViTWithLinearClassifier
 
 # === Instantiate your Model ===
-# - For single model
-model = ViT(
-    image_size=224,
-    image_channel=1,
-    patch_size=16,
-    num_classes=10,
-    dim=512,
-    depth=12,
-    num_heads=16,
-    ff_dropout=0.0,
-    pre_norm=True
-)
+# - For specializations
+specializations = [attr for attr in dir(ViTConfig) if attr.startswith("ViT")]
 
 # === Settings ===
 # - Required:
-input_shape = (1, 1, 224, 224)
+input_shape = (1, 3, 224, 224)
 expected_shape = (1, 10)
 # - Optional:
+kwargs = {}
+kwargs['num_classes'] = 10
 
 # === Test Cases ===
-# Default test for the single model case
+# Default test for specializations
 def test_forward():
-    model.eval()
+    for spec in specializations:
+        print(spec)
+        config = getattr(ViTConfig, spec)(**kwargs)
+        model = ViTWithLinearClassifier(config)
+        model.eval()
 
-    x = torch.randn(input_shape)
-    out = model(x)
+        x = torch.randn(input_shape)
+        out = model(x)
 
-    assert_output_shape_wrong(out, expected_shape)
-    assert_output_has_nan(out)
+        assert_output_shape_wrong(out, expected_shape)
+        assert_output_has_nan(out)
+    
+        del model
+        gc.collect()

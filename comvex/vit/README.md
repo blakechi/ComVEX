@@ -5,28 +5,64 @@ This is an PyTorch implementation of [AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMER
 ## Objects
 
 1. `ViTBase`
-2. `ViT`
+2. `ViTBackbone`
+3. `ViTWithLinearClassifier`
+4. `ViTConfig`
+   - `ViT_B`
+   - `ViT_L`
+   - `ViT_H`
 
 ## Usage
 
-```python
-from comvex.vit import ViT
+1. ViT Configuration
 
-vit = ViT(
+```python
+from comvex.vit import ViTConfig
+
+vit_config = ViTConfig(
     image_size=224,                 # Input image size
     image_channel=3,                # Input image channel
     patch_size=16,                  # Patch size (one lateral of the square patch)
-    num_classes=2,
-    dim=512,                        # Token dimension
+    dim=768,                        # Token dimension
     depth=12,
-    num_heads=16,
-    # Optional arguments
+    num_heads=12,
+    num_classes=1000,           # Number of categories
+    pred_act_fnc_name="ReLU"    # The name of the activation function for the projection head
     pre_norm=False
     ff_dim=None,                    # If not specify, ff_dim = 4*dim
     ff_dropout=0.0,
     token_dropout=0.0,
     self_defined_transformer=None,  # Use self-defined Transformer object
 )
+```
+
+2. ViT Backbone
+
+```python
+from comvex.vit import ViTBackbone
+
+vit_backbone = ViTBackbone(
+    image_size=224,                 # Input image size
+    image_channel=3,                # Input image channel
+    patch_size=16,                  # Patch size (one lateral of the square patch)
+    dim=768,                        # Token dimension
+    depth=12,
+    num_heads=12,
+    pre_norm=False
+    ff_dim=None,                    # If not specify, ff_dim = 4*dim
+    ff_dropout=0.0,
+    token_dropout=0.0,
+    self_defined_transformer=None,  # Use self-defined Transformer object
+)
+```
+
+3. Specifications of the ViT architectures
+
+```python
+from comvex.vit import ViTConfig, ViTWithLinearClassifier
+
+vit_config = ViTConfig.ViT_B()
+vit = ViTWithLinearClassifier(vit_config)
 ```
 
 ## Demo
