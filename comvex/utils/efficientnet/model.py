@@ -3,7 +3,7 @@ from typing import Optional
 import torch
 from torch import nn
 
-from comvex.utils.helpers import name_with_msg
+from comvex.utils.helpers import name_with_msg, get_attr_if_exists
 
 
 class SeperateConvXd(nn.Module):
@@ -45,16 +45,16 @@ class SeperateConvXd(nn.Module):
             kernel_size=1,
         )
 
-        self.norm_0 = getattr(nn, norm_layer_name)(
+        self.norm_0 = get_attr_if_exists(nn, norm_layer_name)(
             in_channel*kernels_per_layer,
             **kwargs
-        ) if norm_layer_name and hasattr(nn, norm_layer_name) else None
-        self.norm_1 = getattr(nn, norm_layer_name)(
+        )
+        self.norm_1 = get_attr_if_exists(nn, norm_layer_name)(
             in_channel*kernels_per_layer,
             **kwargs
-        ) if norm_layer_name and hasattr(nn, norm_layer_name) else None
+        )
             
-        self.act_fnc = getattr(nn, act_fnc_name)() if act_fnc_name and hasattr(nn, act_fnc_name) else None
+        self.act_fnc = get_attr_if_exists(nn, act_fnc_name)()
 
     def forward(self, x):
         x = self.depth_wise_conv(x)
@@ -127,21 +127,21 @@ class MBConvXd(nn.Module):
             kernel_size=1,
         )
 
-        self.pixel_wise_norm_0 = getattr(nn, norm_layer_name)(
+        self.pixel_wise_norm_0 = get_attr_if_exists(nn, norm_layer_name)(
             expand_channel,
             **kwargs
-        ) if norm_layer_name and hasattr(nn, norm_layer_name) else None
-        self.depth_wise_norm = getattr(nn, norm_layer_name)(
+        )
+        self.depth_wise_norm = get_attr_if_exists(nn, norm_layer_name)(
             expand_channel,
             **kwargs
-        ) if norm_layer_name and hasattr(nn, norm_layer_name) else None
-        self.pixel_wise_norm_1 = getattr(nn, norm_layer_name)(
+        )
+        self.pixel_wise_norm_1 = get_attr_if_exists(nn, norm_layer_name)(
             out_channel,
             **kwargs
-        ) if norm_layer_name and hasattr(nn, norm_layer_name) else None
+        )
             
-        self.pixel_wise_act_fnc = getattr(nn, act_fnc_name)() if act_fnc_name and hasattr(nn, act_fnc_name) else None
-        self.depth_wise_act_fnc = getattr(nn, act_fnc_name)() if act_fnc_name and hasattr(nn, act_fnc_name) else None
+        self.pixel_wise_act_fnc = get_attr_if_exists(nn, act_fnc_name)()
+        self.depth_wise_act_fnc = get_attr_if_exists(nn, act_fnc_name)()
 
     def forward(self, x):
 

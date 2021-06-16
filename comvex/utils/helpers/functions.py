@@ -1,4 +1,5 @@
-from typing import Any
+from typing import Optional
+
 from torch import nn
 
 from comvex.utils.config_base import ConfigBase
@@ -6,6 +7,7 @@ from comvex.utils.config_base import ConfigBase
 
 def name_with_msg(instance: nn.Module, msg: str) -> str:
     return f"[{instance.__class__.__name__}] {msg}"
+
 
 def config_pop_argument(config: ConfigBase = ConfigBase(), argument: str = "") -> Any:
     try:
@@ -18,5 +20,8 @@ def config_pop_argument(config: ConfigBase = ConfigBase(), argument: str = "") -
         else:  # raise KeyError as usual
             config.__dict__.pop(argument)
 
+        
+def get_attr_if_exists(module: nn.Module, attr: str) -> Optional[nn.Module]:
+    return getattr(module, attr) if attr and hasattr(module, attr) else None
 
 
