@@ -1,4 +1,5 @@
-from typing import Optional
+from typing import Optional, Any
+import warnings
 
 from torch import nn
 
@@ -22,6 +23,11 @@ def config_pop_argument(config: ConfigBase = ConfigBase(), argument: str = "") -
 
         
 def get_attr_if_exists(module: nn.Module, attr: str) -> Optional[nn.Module]:
-    return getattr(module, attr) if attr and hasattr(module, attr) else None
+    if attr and hasattr(module, attr):
+        return getattr(module, attr)
+
+    warnings.warn(f"Can't find {attr} in {module}")
+    
+    return None
 
 
