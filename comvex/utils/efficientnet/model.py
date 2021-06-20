@@ -6,8 +6,8 @@ import torch
 from torch import nn
 
 from comvex.utils import PathDropout
-from comvex.utils.helpers import name_with_msg, get_attr_if_exists
-
+from comvex.utils.helpers import name_with_msg, get_attr_if_exists, config_pop_argument
+from .config import EfficientNetConfig
 
 class EfficientNetBase(nn.Module):
     __constants__ = [
@@ -36,9 +36,9 @@ class EfficientNetBase(nn.Module):
         self.num_layers = self.scale_and_round_layers([1, 1, 2, 2, 3, 3, 4, 1, 1], depth_scale)
         self.channels = self.scale_and_round_channels([32, 16, 24, 40, 80, 112, 192, 320, 1280], width_scale)
         self.kernel_sizes = [3, 3, 3, 5, 3, 5, 5, 3, 1]    
-        self.strides = [1, 1, 2, 2, 2, 2, 1, 2, 1]
+        self.strides = [1, 2, 1, 2, 2, 2, 1, 2, 1]
         self.expand_scales = [None, 1, 6, 6, 6, 6, 6, 6, None]
-        self.se_scales = [None, *(se_scale)*7, None]
+        self.se_scales = [None, *((se_scale,)*7), None]
 
         self.resolution = resolution
         # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/preprocessing.py#L88
@@ -47,7 +47,7 @@ class EfficientNetBase(nn.Module):
         self.return_feature_maps = return_feature_maps
 
     def scale_and_round_layers(self, in_list: List[int], scale) -> List[int]:
-        out = map(lambda x: int(math.ceil(x*scale)), in_list)
+        out = list(map(lambda x: int(math.ceil(x*scale)), in_list))
         out[0] = 1  # Stage 1 always has one layer
 
         return out
@@ -69,15 +69,12 @@ class EfficientNetBase(nn.Module):
         """
         depth_divisor, min_depth = 8, 8
 
-        filters = map(lambda x: x*scale, in_list)
-
-        new_filters = map(lambda x: max(min_depth, int(x + depth_divisor / 2) // depth_divisor * depth_divisor), filters)
+        filters = list(map(lambda x: x*scale, in_list))
+        new_filters = list(map(lambda x: max(min_depth, int(x + depth_divisor / 2) // depth_divisor * depth_divisor), filters))
 
         # Make sure that round down does not go down by more than 10%.
-        if new_filters < 0.9 * filters:
-            new_filters += depth_divisor
-        new_filters = map(lambda new_x, x: int(new_x + depth_divisor) if new_x < 0.9*x else int(new_x), (new_filters, filters))
-        
+        new_filters = list(map(lambda xs: int(xs[0] + depth_divisor) if xs[0] < 0.9*xs[1] else int(xs[0]), zip(new_filters, filters)))
+
         return new_filters
 
 
@@ -166,10 +163,10 @@ class MBConvXd(nn.Module):
         padding: int = 1, 
         norm_layer_name: str = "BatchNorm2d",
         act_fnc_name: str = "SiLU",
-        path_dropout: float = 0.,
         se_scale: Optional[float] = None,
         se_act_fnc_name: str = "SiLU",
         dimension: int = 2,
+        path_dropout: float = 0.,
         **kwargs  # For example: `eps` and `elementwise_affine` for `nn.LayerNorm`
     ):
         super().__init__()
@@ -227,7 +224,7 @@ class MBConvXd(nn.Module):
 
         #
         self.se_block = None
-        if se_scale:
+        if se_scale is not None:
             bottleneck_channel = int(expand_channel*se_scale)
 
             self.se_block = nn.Sequential(
@@ -252,9 +249,11 @@ class MBConvXd(nn.Module):
             )
         )
 
-        #
+        # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/utils.py#L276
+        # It's a batch-wise dropout
         self.path_dropout = PathDropout(path_dropout)
-            
+        self.skip = True if in_channel == out_channel and stride == 1 else False
+
     def forward(self, x):
 
         # First pixel-wise conv
@@ -269,8 +268,11 @@ class MBConvXd(nn.Module):
 
         # Second pixel-wise conv
         res = self.pixel_wise_conv_1(res)
-            
-        return x + self.path_dropout(res)
+        
+        # Path Dropout
+        res = self.path_dropout(res)
+
+        return x + res if self.skip else res
 
     @classmethod
     def MBConv2d6k3(cls, in_channel: int, out_channel: int, **kwargs) -> "MBConvXd":
@@ -296,37 +298,39 @@ class EfficientNetBackbone(EfficientNetBase):
         up_sampling_mode: Optional[str] = None,
         act_fnc_name: str = "SiLU",
         se_act_fnc_name: str = "SiLU",
-        path_dropout: float = 0.,
         # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_builder.py#L187-L188
         batch_norm_eps: float = 1e-3,
         batch_norm_momentum: float = 0.99,
         return_feature_map: bool = False,
+        # Can be overrided in here: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/main.py#L256
+        # Not sure its value, so just follow `ff_dropout` for the output head
+        path_dropout: float = 0.,
     ) -> None:
         super().__init__(depth_scale, width_scale, resolution, up_sampling_mode, return_feature_map)
 
         kwargs = {}
         kwargs["path_dropout"] = path_dropout
-        kwargs["batch_norm_eps"] = batch_norm_eps
-        kwargs["batch_norm_momentum"] = batch_norm_momentum
+        kwargs["eps"] = batch_norm_eps
+        kwargs["momentum"] = batch_norm_momentum
         kwargs["act_fnc_name"] = act_fnc_name
         kwargs["se_act_fnc_name"] = se_act_fnc_name
         
-        self.stage_1 = self._build_stage("1", kwargs,
+        self.stage_1 = self._build_stage("1", **kwargs,
             in_channel=image_channel,
             out_channel=self.channels[0],
-            kernel_size=3
+            kernel_size=self.kernel_sizes[0]
         )
-        self.stage_2 = self._build_stage("2", kwargs)
-        self.stage_3 = self._build_stage("3", kwargs)
-        self.stage_4 = self._build_stage("4", kwargs)
-        self.stage_5 = self._build_stage("5", kwargs)
-        self.stage_6 = self._build_stage("6", kwargs)
-        self.stage_7 = self._build_stage("7", kwargs)
-        self.stage_8 = self._build_stage("8", kwargs)
-        self.stage_9 = self._build_stage("9", kwargs,
+        self.stage_2 = self._build_stage("2", **kwargs)
+        self.stage_3 = self._build_stage("3", **kwargs)
+        self.stage_4 = self._build_stage("4", **kwargs)
+        self.stage_5 = self._build_stage("5", **kwargs)
+        self.stage_6 = self._build_stage("6", **kwargs)
+        self.stage_7 = self._build_stage("7", **kwargs)
+        self.stage_8 = self._build_stage("8", **kwargs)
+        self.stage_9 = self._build_stage("9", **kwargs,
             in_channel=self.channels[-2],
             out_channel=self.channels[-1],
-            kernel_size=1
+            kernel_size=self.kernel_sizes[-1]
         )
 
     def forward(self, x: torch.Tensor) -> Union[
@@ -338,49 +342,55 @@ class EfficientNetBackbone(EfficientNetBase):
             x = self.up_sampling(x)
 
         if self.return_feature_maps:
-            endpoints = {}
+            feature_maps = {}
 
         x = self.stage_1(x)
         x = self.stage_2(x)
         x = self.stage_3(x)
         if self.return_feature_maps:
-            endpoints['reduction_1'] = x
+            feature_maps['reduction_1'] = x
 
         x = self.stage_4(x)
         if self.return_feature_maps:
-            endpoints['reduction_2'] = x
+            feature_maps['reduction_2'] = x
 
         x = self.stage_5(x)
         if self.return_feature_maps:
-            endpoints['reduction_3'] = x
+            feature_maps['reduction_3'] = x
 
         x = self.stage_6(x)
         x = self.stage_7(x)
         if self.return_feature_maps:
-            endpoints['reduction_4'] = x
+            feature_maps['reduction_4'] = x
 
         x = self.stage_8(x)
         x = self.stage_9(x)
         if self.return_feature_maps:
-            endpoints['reduction_5'] = x
+            feature_maps['reduction_5'] = x
             
-        return (x, endpoints) if self.return_feature_maps else x
+        return (x, feature_maps) if self.return_feature_maps else x
 
     def _build_stage(self, stage_idx: str, **kwargs) -> nn.Module:
         access_idx = int(stage_idx) - 1  # Since the naming of stages is not 0-based
 
         if 0 < access_idx and access_idx < 8:  # If it's Stage 2 ~ 8
+            path_dropout = kwargs.pop("path_dropout")
+
             return nn.Sequential(OrderedDict([
                 (
-                    f"stage_{stage_idx}_layer_{idx}",
+                    f"layer_{idx}",
                     MBConvXd(
-                        in_channel=self.channels[access_idx - 1],
+                        in_channel=self.channels[access_idx - 1] if idx == 0 else self.channels[access_idx],
                         out_channel=self.channels[access_idx],
                         expand_scale=self.expand_scales[access_idx],
                         kernel_size=self.kernel_sizes[access_idx],
-                        stride=self.strides[access_idx] if idx == 0 else 1,  # only for the first MBConvXd block
-                        padding=self.strides[access_idx] // 2 if idx == 0 else 0,  # only for the first MBConvXd block, (stride = 1 -> padding = 0), (stride = 3 -> padding = 1), (stride = 5 -> padding = 2)
+                        # only for the first MBConvXd block
+                        stride=self.strides[access_idx] if idx == 0 else 1,
+                        # only for the first MBConvXd block, (kernel_size = 1 -> padding = 0), (kernel_size = 3 -> padding = 1), (kernel_size = 5 -> padding = 2)
+                        padding=self.kernel_sizes[access_idx] // 2,
                         se_scale=self.se_scales[access_idx],
+                        # Inverted `survival_prob` from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_model.py#L659
+                        path_dropout=path_dropout*(access_idx + 1) / 9,  # 9 for the number of stages
                         **kwargs
                     )
                 ) for idx in range(self.num_layers[access_idx])
@@ -391,13 +401,55 @@ class EfficientNetBackbone(EfficientNetBase):
                 (
                     f"stage_{stage_idx}_layer_0",
                     nn.Sequential(
-                        nn.Conv2d(kwargs['in_channel'], kwargs['out_channel'], kwargs['kernel_size'], bias=False),
+                        nn.Conv2d(
+                            kwargs['in_channel'],
+                            kwargs['out_channel'],
+                            kwargs['kernel_size'],
+                            padding=kwargs['kernel_size'] // 2,
+                            bias=False
+                        ),
                         nn.BatchNorm2d(
                             kwargs['out_channel'],
-                            eps=kwargs['batch_norm_eps'],
-                            momentum=kwargs['batch_norm_momentum'],
+                            eps=kwargs['eps'],
+                            momentum=kwargs['momentum'],
                         ),
-                        get_attr_if_exists(nn.Module, kwargs['act_fnc_name'])()
+                        get_attr_if_exists(nn, kwargs['act_fnc_name'])()
                     )
                 )
             ]))
+
+    def num_parameters(self) -> int:
+        return sum(params.numel() for _, params in self.named_parameters())
+
+
+class EfficientNetWithLinearClassifier(EfficientNetBackbone):
+    def __init__(self, config: EfficientNetConfig = None) -> None:
+        ff_dropout = config_pop_argument(config, "ff_dropout")
+        num_classes = config_pop_argument(config, "num_classes")
+        super().__init__(**config.__dict__)
+
+        self.pooler = nn.AdaptiveAvgPool2d((1, 1))
+        self.ff_dropout = nn.Dropout(ff_dropout)
+        self.proj_head = nn.Linear(
+            self.channels[-1],
+            num_classes
+        )
+
+    def forward(self, x: torch.Tensor) -> Union[
+        Tuple[torch.Tensor, Dict[str, torch.Tensor]],
+        torch.Tensor
+    ]:
+        b, *rest = x.shape
+        if self.return_feature_maps:
+            x, feature_maps = super().forward(x)
+        else:
+            x = super().forward(x)
+
+        # (B, C, H, W) -> (B, C, 1, 1) -> (B, C), avoid einops here now for scripting, edit it when einops is scriptable
+        x = self.pooler(x).view(b, -1)
+
+        x = self.ff_dropout(x)
+        x = self.proj_head(x)
+
+        return (x, feature_maps) if self.return_feature_maps else x
+
