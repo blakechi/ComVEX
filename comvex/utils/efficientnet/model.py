@@ -49,7 +49,8 @@ class EfficientNetBase(nn.Module):
     def scale_and_round_layers(self, in_list: List[int], scale) -> List[int]:
         out = list(map(lambda x: int(math.ceil(x*scale)), in_list))
         out[0] = 1  # Stage 1 always has one layer
-
+        out[-1] = 1  # Stage 9 always has one layer
+        
         return out
 
     def scale_and_round_channels(self, in_list: List[int], scale) -> List[int]:
