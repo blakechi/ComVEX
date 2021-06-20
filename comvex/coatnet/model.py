@@ -1,4 +1,5 @@
-from typing import List, OrderedDict, Union
+from typing import List, Union
+from collections import OrderedDict
 
 import torch
 from torch import nn, einsum
