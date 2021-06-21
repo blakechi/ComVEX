@@ -30,12 +30,11 @@ root = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(root, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-with open(os.path.join(root, 'version.txt'), 'r') as f:
-    version = f.read().strip()
+exec(open(os.path.join(root, 'version.txt').read()))
 
 setup(
     name='comvex',
-    version=version,
+    version=__version__,
     keywords='pytorch einops computer-vision',
     description='Implementations of Recent Papers in Computer Vision',
     long_description=long_description,
