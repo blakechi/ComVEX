@@ -123,7 +123,7 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
             
             if self.return_feature_maps and self.strides[stage_idx] == 2:  # If be asked to return the feature map and H and W shrink
                 feature_maps[f"stage_{stage_idx}"] = x
-        print(self.return_feature_maps)
+
         return (x, feature_maps) if self.return_feature_maps else x
 
     def _build_stage(self, stage_idx: int, **kwargs) -> nn.Module:
@@ -146,7 +146,7 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
                         padding=self.kernel_sizes[stage_idx] // 2,
                         se_scale=self.se_scales[stage_idx],
                         # Inverted `survival_prob` from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_model.py#L659
-                        path_dropout=path_dropout*(stage_idx + 1) / num_stages,
+                        path_dropout=path_dropout*(stage_idx + 1) / (num_stages - 2),  # 2 for the first and last stage
                         **kwargs
                     ) 
                 ) for idx in range(self.num_layers[stage_idx])

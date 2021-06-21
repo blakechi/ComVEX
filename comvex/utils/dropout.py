@@ -32,7 +32,7 @@ def dimension_wise_dropout(x: torch.Tensor, dropout_rate: float = .0, dim: int =
     ), f"[dimension_wise_dropout] Dropout rate should be greater than 0 and less than 1, but got {dropout_rate}"
 
     keep_rate = 1. - dropout_rate
-    shape = (1,)*x.ndim
+    shape = [1,]*x.ndim
     shape[dim] = x.shape[dim]
     mask = (torch.rand(shape, dtype=x.dtype, device=x.device) + keep_rate).floor_()
 

@@ -413,7 +413,8 @@ class EfficientNetBackbone(EfficientNetBase):
 
     def _build_stage(self, stage_idx: str, **kwargs) -> nn.Module:
         access_idx = int(stage_idx) - 1  # Since the naming of stages is not 0-based
-
+        num_stages = len(self.num_layers)
+        
         if 0 < access_idx and access_idx < 8:  # If it's Stage 2 ~ 8
             path_dropout = kwargs.pop("path_dropout")
 
@@ -431,7 +432,7 @@ class EfficientNetBackbone(EfficientNetBase):
                         padding=self.kernel_sizes[access_idx] // 2,
                         se_scale=self.se_scales[access_idx],
                         # Inverted `survival_prob` from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_model.py#L659
-                        path_dropout=path_dropout*(access_idx + 1) / len(self.num_layers),
+                        path_dropout=path_dropout*(access_idx + 1) / (num_stages - 2),  # 2 for the first and last stage
                         **kwargs
                     )
                 ) for idx in range(self.num_layers[access_idx])
