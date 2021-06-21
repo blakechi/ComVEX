@@ -5,7 +5,7 @@ import math
 import torch
 from torch import nn
 
-from comvex.utils import PathDropout
+from comvex.utils import PathDropout, XXXConvXdBase
 from comvex.utils.helpers import name_with_msg, get_attr_if_exists, config_pop_argument
 from .config import EfficientNetConfig
 
@@ -80,7 +80,7 @@ class EfficientNetBase(nn.Module):
         return new_filters
 
 
-class SeperateConvXd(nn.Module):
+class SeperateConvXd(XXXConvXdBase):
     r"""
     Reference from: MnasNet (https://arxiv.org/pdf/1807.11626.pdf)
     """
@@ -96,60 +96,76 @@ class SeperateConvXd(nn.Module):
         act_fnc_name: str = "ReLU",
         dimension: int = 2,
         **kwargs  # For the normalization layer
-    ):
-        super().__init__()
-
-        assert (
-            (0 < dimension) and (dimension < 4)
-        ), name_with_msg(self, "`dimension` must be larger than 0 and smaller than 4")
-
-        if dimension == 1:
-            conv = nn.Conv1d
-        elif dimension == 2:
-            conv = nn.Conv2d
-        else: 
-            conv = nn.Conv3d
+    ) -> None:
+        super().__init__(in_channel, out_channel, dimension=dimension)
 
         self.depth_wise_conv = nn.Sequential(
-            conv(
-                in_channel, 
-                in_channel*kernels_per_layer, 
+            self.conv(
+                self.in_channel, 
+                self.in_channel*kernels_per_layer, 
                 kernel_size, 
                 padding=padding, 
-                groups=in_channel
+                groups=self.in_channel
             ),
             get_attr_if_exists(nn, norm_layer_name)(
-                in_channel*kernels_per_layer,
+                self.in_channel*kernels_per_layer,
                 **kwargs
             ),
             get_attr_if_exists(nn, act_fnc_name)()
         )
         self.pixel_wise_conv = nn.Sequential(
-            conv(
-                in_channel*kernels_per_layer,
+            self.conv(
+                self.in_channel*kernels_per_layer,
                 out_channel,
                 kernel_size=1,
             ),
             get_attr_if_exists(nn, norm_layer_name)(
-                in_channel*kernels_per_layer,
+                self.in_channel*kernels_per_layer,
                 **kwargs
             )
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.depth_wise_conv(x)
         x = self.pixel_wise_conv(x)
 
         return x
 
 
-class MBConvXd(nn.Module):
+class SEConvXd(XXXConvXdBase):
+    r"""
+    Squeeze-and-Excitation Convolution 
+
+    From: Squeeze-and-Excitation Networks (https://arxiv.org/pdf/1709.01507.pdf)
+    """
+    def __init__(
+        self,
+        in_channel: int,
+        bottleneck_channel: int,
+        out_channel: Optional[int] = None,
+        se_act_fnc_name: Optional[str] = None,
+        dimension: int = 2,
+    ) -> None:
+        super().__init__(in_channel, out_channel, dimension=dimension)
+
+        self.layers = nn.Sequential(
+            nn.AdaptiveMaxPool2d((1, 1)),
+            self.conv(self.in_channel, bottleneck_channel, 1),
+            get_attr_if_exists(nn, se_act_fnc_name)(),
+            self.conv(bottleneck_channel, self.out_channel, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x*self.layers(x)        
+
+
+class MBConvXd(XXXConvXdBase):
     r"""
     Reference from: 
         1. MobileNetV2 (https://arxiv.org/pdf/1801.04381.pdf)
         2. MnasNet (https://arxiv.org/pdf/1807.11626.pdf)
-        3. Squeeze-and-Excitation Networks (https://arxiv.org/pdf/1709.01507.pdf)
-        4. Official Implementation (https://github.com/tensorflow/tpu/blob/master/models/official/efficientnet/efficientnet_model.py)
+        3. Official Implementation (https://github.com/tensorflow/tpu/blob/master/models/official/efficientnet/efficientnet_model.py)
     
     Note: `Swish` is called `SiLU` in PyTorch
     """
@@ -172,20 +188,7 @@ class MBConvXd(nn.Module):
         expansion_head_type: Literal["pixel_depth", "fused"] = "pixel_depth",
         **kwargs  # For example: `eps` and `elementwise_affine` for `nn.LayerNorm`
     ):
-        super().__init__()
-
-        out_channel = out_channel if out_channel is not None else in_channel
-
-        assert (
-            (0 < dimension) and (dimension < 4)
-        ), name_with_msg(self, "`dimension` must be larger than 0 and smaller than 4")
-
-        if dimension == 1:
-            conv = nn.Conv1d
-        elif dimension == 2:
-            conv = nn.Conv2d
-        else: 
-            conv = nn.Conv3d
+        super().__init__(in_channel, out_channel, dimension=dimension)
 
         assert (
             expand_channel is not None or expand_scale is not None
@@ -202,8 +205,8 @@ class MBConvXd(nn.Module):
         # Expansion Head
         if expansion_head_type == "pixel_depth":
             pixel_wise_conv_0 = nn.Sequential(
-                conv(
-                    in_channel,
+                self.conv(
+                    self.in_channel,
                     expand_channel,
                     kernel_size=1,
                     bias=False
@@ -216,7 +219,7 @@ class MBConvXd(nn.Module):
             )
 
             depth_wise_conv = nn.Sequential(
-                conv(
+                self.conv(
                     expand_channel, 
                     expand_channel, 
                     kernel_size, 
@@ -239,7 +242,7 @@ class MBConvXd(nn.Module):
         else:
             self.expansion_head = nn.Sequential(
                 nn.Conv2d(
-                    in_channel,
+                    self.in_channel,
                     expand_channel,
                     kernel_size,
                     stride=stride,
@@ -258,24 +261,22 @@ class MBConvXd(nn.Module):
         if se_scale is not None:
             bottleneck_channel = int(expand_channel*se_scale)
 
-            self.se_block = nn.Sequential(
-                nn.AdaptiveMaxPool2d((1, 1)),
-                nn.Conv2d(expand_channel, bottleneck_channel, 1),
-                get_attr_if_exists(nn, se_act_fnc_name)(),
-                nn.Conv2d(bottleneck_channel, expand_channel, 1),
-                nn.Sigmoid(),
+            self.se_block = SEConvXd(
+                expand_channel,
+                bottleneck_channel,
+                se_act_fnc_name=se_act_fnc_name,
             )
 
         #
         self.pixel_wise_conv_1 = nn.Sequential(
-            conv(
+            self.conv(
                 expand_channel,
-                out_channel,
+                self.out_channel,
                 kernel_size=1,
                 bias=False,
             ),
             get_attr_if_exists(nn, norm_layer_name)(
-                out_channel,
+                self.out_channel,
                 **kwargs
             )
         )
@@ -283,7 +284,7 @@ class MBConvXd(nn.Module):
         # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/utils.py#L276
         # It's a batch-wise dropout
         self.path_dropout = PathDropout(path_dropout)
-        self.skip = True if in_channel == out_channel and stride == 1 else False
+        self.skip = True if self.in_channel == self.out_channel and stride == 1 else False
 
     def forward(self, x):
 
@@ -292,7 +293,7 @@ class MBConvXd(nn.Module):
 
         # SE block
         if self.se_block is not None:
-            res = res*self.se_block(res)
+            res = self.se_block(res)
 
         # Second pixel-wise conv
         res = self.pixel_wise_conv_1(res)
