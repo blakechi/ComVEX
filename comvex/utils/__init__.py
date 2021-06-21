@@ -1,5 +1,6 @@
 from .base_block import Residual, LayerNorm, MaskLayerNorm, FeedForward, ProjectionHead, MLP
 from .config_base import ConfigBase
+from .convolution import XXXConvXdBase
 from .dropout import TokenWiseDropout, TokenDropout, PathDropout
 from .efficientnet import EfficientNetBase, SeperateConvXd, MBConvXd, EfficientNetBackbone, EfficientNetWithLinearClassifier, EfficientNetConfig
 from .layer_scale import AffineTransform, LayerScaleBlock
@@ -12,6 +13,7 @@ from .unet import UNetBase, UNetConvBlock, UNetEncoder, UNetDecoder, UNet
 __all__ = [
     "Residual", "LayerNorm", "MaskLayerNorm", "FeedForward", "ProjectionHead", "MLP",
     "ConfigBase",
+    "XXXConvXdBase",
     "TokenWiseDropout", "TokenDropout", "PathDropout",
     "EfficientNetBase", "SeperateConvXd", "MBConvXd", "EfficientNetBackbone", "EfficientNetWithLinearClassifier", "EfficientNetConfig",
     "AffineTransform", "LayerScaleBlock",
