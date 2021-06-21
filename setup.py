@@ -30,7 +30,7 @@ root = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(root, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-exec(open(os.path.join(root, 'version.txt')).read())
+exec(open(os.path.join(root, 'version.py')).read())
 
 setup(
     name='comvex',
