@@ -1,5 +1,5 @@
+from typing import Optional, Union, List, Tuple, Dict, Literal
 from collections import OrderedDict
-from typing import Optional, Union, List, Tuple, Dict
 import math
 
 import torch
@@ -9,9 +9,10 @@ from comvex.utils import PathDropout
 from comvex.utils.helpers import name_with_msg, get_attr_if_exists, config_pop_argument
 from .config import EfficientNetConfig
 
+
 class EfficientNetBase(nn.Module):
     __constants__ = [
-        "layers",
+        "num_layers",
         "channels",
         "kernel_sizes",
         "strides",
@@ -26,9 +27,9 @@ class EfficientNetBase(nn.Module):
         depth_scale: float,
         width_scale: float,
         resolution: int,
+        se_scale: float = 0.25,
         up_sampling_mode: Optional[str] = None,  # Check out: https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html?highlight=up%20sample#torch.nn.Upsample
         return_feature_maps: bool = False,
-        se_scale: float = 0.25,
     ) -> None:
         super().__init__()
 
@@ -168,6 +169,7 @@ class MBConvXd(nn.Module):
         se_act_fnc_name: str = "SiLU",
         dimension: int = 2,
         path_dropout: float = 0.,
+        expansion_head_type: Literal["pixel_depth", "fused"] = "pixel_depth",
         **kwargs  # For example: `eps` and `elementwise_affine` for `nn.LayerNorm`
     ):
         super().__init__()
@@ -190,38 +192,66 @@ class MBConvXd(nn.Module):
         ), name_with_msg(self, "Either `expand_channel` or `expand_scale` should be specified")
         expand_channel = expand_channel if expand_channel is not None else in_channel*expand_scale
 
-        #
-        self.pixel_wise_conv_0 = nn.Sequential(
-            conv(
-                in_channel,
-                expand_channel,
-                kernel_size=1,
-                bias=False
-            ),
-            get_attr_if_exists(nn, norm_layer_name)(
-                expand_channel,
-                **kwargs
-            ),
-            get_attr_if_exists(nn, act_fnc_name)()
+        assert (
+            isinstance(expansion_head_type, str) and expansion_head_type in ["pixel_depth", "fused"]
+        ), name_with_msg(
+            f"The specified `expansion_head_type` - {expansion_head_type} ({type(expansion_head_type)}) doesn't exist.\n \
+            Please choose from here: ['pixel_depth', 'fused']"
         )
 
-        #
-        self.depth_wise_conv = nn.Sequential(
-            conv(
-                expand_channel, 
-                expand_channel, 
-                kernel_size, 
-                stride=stride,
-                padding=padding, 
-                groups=expand_channel,
-                bias=False
-            ),
-            get_attr_if_exists(nn, norm_layer_name)(
-                expand_channel,
-                **kwargs
-            ),
-            get_attr_if_exists(nn, act_fnc_name)()
-        )
+        # Expansion Head
+        if expansion_head_type == "pixel_depth":
+            pixel_wise_conv_0 = nn.Sequential(
+                conv(
+                    in_channel,
+                    expand_channel,
+                    kernel_size=1,
+                    bias=False
+                ),
+                get_attr_if_exists(nn, norm_layer_name)(
+                    expand_channel,
+                    **kwargs
+                ),
+                get_attr_if_exists(nn, act_fnc_name)()
+            )
+
+            depth_wise_conv = nn.Sequential(
+                conv(
+                    expand_channel, 
+                    expand_channel, 
+                    kernel_size, 
+                    stride=stride,
+                    padding=padding, 
+                    groups=expand_channel,
+                    bias=False
+                ),
+                get_attr_if_exists(nn, norm_layer_name)(
+                    expand_channel,
+                    **kwargs
+                ),
+                get_attr_if_exists(nn, act_fnc_name)()
+            )
+
+            self.expansion_head = nn.Sequential(
+                pixel_wise_conv_0,
+                depth_wise_conv
+            )
+        else:
+            self.expansion_head = nn.Sequential(
+                nn.Conv2d(
+                    in_channel,
+                    expand_channel,
+                    kernel_size,
+                    stride=stride,
+                    padding=padding,
+                    bias=False
+                ),
+                get_attr_if_exists(nn, norm_layer_name)(
+                    expand_channel,
+                    **kwargs
+                ),
+                get_attr_if_exists(nn, act_fnc_name)()
+            )
 
         #
         self.se_block = None
@@ -257,11 +287,8 @@ class MBConvXd(nn.Module):
 
     def forward(self, x):
 
-        # First pixel-wise conv
-        res = self.pixel_wise_conv_0(x)
-        
-        # Depth-wise conv
-        res = self.depth_wise_conv(res)
+        # expansion head
+        res = self.expansion_head(x)
 
         # SE block
         if self.se_block is not None:
@@ -285,6 +312,7 @@ class MBConvXd(nn.Module):
             out_channel,
             expand_scale=6,
             kernel_size=3,
+            expansion_head_type="pixel_depth",
             **kwargs
         )
 
@@ -299,15 +327,23 @@ class EfficientNetBackbone(EfficientNetBase):
         up_sampling_mode: Optional[str] = None,
         act_fnc_name: str = "SiLU",
         se_act_fnc_name: str = "SiLU",
+        se_scale: float = 0.25,
         # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_builder.py#L187-L188
         batch_norm_eps: float = 1e-3,
         batch_norm_momentum: float = 0.99,
         return_feature_map: bool = False,
-        # Can be overrided in here: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/main.py#L256
-        # Not sure its value, so just follow `ff_dropout` for the output head
-        path_dropout: float = 0.,
+        # Can be overrided here in `EfficientNet`: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/main.py#L256
+        # But from `EfficientNetV2`: https://github.com/google/automl/blob/master/efficientnetv2/hparams.py#L234, it's 0.2 and doesn't be overrided later.
+        path_dropout: float = 0.2,
     ) -> None:
-        super().__init__(depth_scale, width_scale, resolution, up_sampling_mode, return_feature_map)
+        super().__init__(
+            depth_scale,
+            width_scale,
+            resolution,
+            up_sampling_mode,
+            return_feature_map,
+            se_scale
+        )
 
         kwargs = {}
         kwargs["path_dropout"] = path_dropout
@@ -387,11 +423,11 @@ class EfficientNetBackbone(EfficientNetBase):
                         kernel_size=self.kernel_sizes[access_idx],
                         # only for the first MBConvXd block
                         stride=self.strides[access_idx] if idx == 0 else 1,
-                        # only for the first MBConvXd block, (kernel_size = 1 -> padding = 0), (kernel_size = 3 -> padding = 1), (kernel_size = 5 -> padding = 2)
+                        # (kernel_size = 1 -> padding = 0), (kernel_size = 3 -> padding = 1), (kernel_size = 5 -> padding = 2)
                         padding=self.kernel_sizes[access_idx] // 2,
                         se_scale=self.se_scales[access_idx],
                         # Inverted `survival_prob` from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_model.py#L659
-                        path_dropout=path_dropout*(access_idx + 1) / 9,  # 9 for the number of stages
+                        path_dropout=path_dropout*(access_idx + 1) / len(self.num_layers),
                         **kwargs
                     )
                 ) for idx in range(self.num_layers[access_idx])
@@ -400,7 +436,7 @@ class EfficientNetBackbone(EfficientNetBase):
         else:
             return nn.Sequential(OrderedDict([
                 (
-                    f"stage_{stage_idx}_layer_0",
+                    f"layer_0",
                     nn.Sequential(
                         nn.Conv2d(
                             kwargs['in_channel'],

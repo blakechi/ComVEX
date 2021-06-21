@@ -1,5 +1,8 @@
 import gc
+import pytest
+
 import torch
+
 from .utils import *
 
 # === Import model-related objects ===
@@ -38,17 +41,18 @@ def test_forward():
         del model
         gc.collect()
 
-# def test_num_parameters():
-#     for idx, spec in enumerate(specializations):
-#         print(spec)
-#         config = getattr(EfficientNetConfig, spec)(**kwargs)
-#         model = EfficientNetWithLinearClassifier(config)
-#         model.eval()
-#         num_params = model.num_parameters()
-#         num_params = round(num_params / 1e6, 1)
+@pytest.mark.skipif(True, reason="skip until find the why the number of parameters doesn't match with the official one.")
+def test_num_parameters():
+    for idx, spec in enumerate(specializations):
+        print(spec)
+        config = getattr(EfficientNetConfig, spec)(**kwargs)
+        model = EfficientNetWithLinearClassifier(config)
+        model.eval()
+        num_params = model.num_parameters()
+        num_params = round(num_params / 1e6, 1)
         
-#         assert (
-#             official_num_params[idx] == num_params
-#         ), f"The number of Parameters from official: {official_num_params[idx]} doesn't match self-implementated: {num_params}"
+        assert (
+            official_num_params[idx] == num_params
+        ), f"The number of Parameters from official: {official_num_params[idx]} doesn't match self-implementated: {num_params}"
 
-#         gc.collect()
+        gc.collect()

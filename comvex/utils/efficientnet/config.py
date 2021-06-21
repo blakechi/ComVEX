@@ -14,10 +14,11 @@ class EfficientNetConfig(ConfigBase):
         up_sampling_mode: Optional[str] = None,
         act_fnc_name: str = "SiLU",
         se_act_fnc_name: str = "SiLU",
+        se_scale: float = 0.25,
         batch_norm_eps: float = 1e-3,
         batch_norm_momentum: float = 0.99,
         return_feature_map: bool = False,
-        path_dropout: float = 0.,
+        path_dropout: float = 0.2,
         ff_dropout: float = 0.,
     ) -> None:
         super().__init__()
@@ -30,6 +31,7 @@ class EfficientNetConfig(ConfigBase):
         self.up_sampling_mode = up_sampling_mode
         self.act_fnc_name = act_fnc_name
         self.se_act_fnc_name = se_act_fnc_name
+        self.se_scale = se_scale
         self.batch_norm_eps = batch_norm_eps
         self.batch_norm_momentum = batch_norm_momentum
         self.return_feature_map = return_feature_map
@@ -46,7 +48,6 @@ class EfficientNetConfig(ConfigBase):
             224,
             num_classes=num_classes,
             ff_dropout=0.2,
-            path_dropout=0.2,
             **kwargs,
         )
         
@@ -59,7 +60,6 @@ class EfficientNetConfig(ConfigBase):
             240,
             num_classes=num_classes,
             ff_dropout=0.2,
-            path_dropout=0.2,
             **kwargs,
         )
         
@@ -72,7 +72,6 @@ class EfficientNetConfig(ConfigBase):
             260,
             num_classes=num_classes,
             ff_dropout=0.3,
-            path_dropout=0.3,
             **kwargs,
         )
         
@@ -85,7 +84,6 @@ class EfficientNetConfig(ConfigBase):
             300,
             num_classes=num_classes,
             ff_dropout=0.3,
-            path_dropout=0.3,
             **kwargs,
         )
         
@@ -98,7 +96,6 @@ class EfficientNetConfig(ConfigBase):
             380,
             num_classes=num_classes,
             ff_dropout=0.4,
-            path_dropout=0.4,
             **kwargs,
         )
         
@@ -111,7 +108,6 @@ class EfficientNetConfig(ConfigBase):
             456,
             num_classes=num_classes,
             ff_dropout=0.4,
-            path_dropout=0.4,
             **kwargs,
         )
         
@@ -124,7 +120,6 @@ class EfficientNetConfig(ConfigBase):
             528,
             num_classes=num_classes,
             ff_dropout=0.5,
-            path_dropout=0.5,
             **kwargs,
         )
         
@@ -137,7 +132,6 @@ class EfficientNetConfig(ConfigBase):
             600,
             num_classes=num_classes,
             ff_dropout=0.5,
-            path_dropout=0.5,
             **kwargs,
         )
         
@@ -150,7 +144,6 @@ class EfficientNetConfig(ConfigBase):
             672,
             num_classes=num_classes,
             ff_dropout=0.5,
-            path_dropout=0.5,
             **kwargs,
         )
         
@@ -163,7 +156,6 @@ class EfficientNetConfig(ConfigBase):
             800,
             num_classes=num_classes,
             ff_dropout=0.5,
-            path_dropout=0.5,
             **kwargs,
         )
         
