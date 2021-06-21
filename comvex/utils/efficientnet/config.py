@@ -17,7 +17,7 @@ class EfficientNetConfig(ConfigBase):
         se_scale: float = 0.25,
         batch_norm_eps: float = 1e-3,
         batch_norm_momentum: float = 0.99,
-        return_feature_map: bool = False,
+        return_feature_maps: bool = False,
         path_dropout: float = 0.2,
         ff_dropout: float = 0.,
     ) -> None:
@@ -34,7 +34,7 @@ class EfficientNetConfig(ConfigBase):
         self.se_scale = se_scale
         self.batch_norm_eps = batch_norm_eps
         self.batch_norm_momentum = batch_norm_momentum
-        self.return_feature_map = return_feature_map
+        self.return_feature_maps = return_feature_maps
         self.path_dropout = path_dropout
         self.ff_dropout = ff_dropout
 

@@ -21,9 +21,9 @@ class EfficientNetV2Base(EfficientNetBase):
         width_scale: float,
         train_resolution: int,
         eval_resolution: int,
-        se_scale: float,
-        up_sampling_mode: Optional[str],  # Not recommmand, should be done by `torchvision.transforms`
-        return_feature_maps: bool,
+        se_scale: float = 0.25,
+        up_sampling_mode: Optional[str] = None,  # Not recommmand, should be done by `torchvision.transforms`
+        return_feature_maps: bool = False,
     ) -> None:
         # What if we don't init EfficientBEtBase but nn.Module only?
         super().__init__(
@@ -36,27 +36,26 @@ class EfficientNetV2Base(EfficientNetBase):
         )
 
         # Table 4. from the official paper (all stages)
-        self.num_layers = ([1, 2, 4, 4, 6, 9, 15, 1], depth_scale)
-        self.channels = ([24, 24, 48, 64, 128, 160, 272, 1792], width_scale)
-        self.kernel_sizes = [*((3,)*7), 1]    
-        self.strides = [2, 1, 2, 2, 2, 1, 2, 1]
-        self.expand_scales = [None, 1, 4, 4, 4, 6, 6, None]
-        self.se_scales = [None, *((se_scale,)*6), None]
-        self.use_fuesed_MBConv = [None, *((True)*3), *((False)*3), None]
+        # set: num_layers, channels, kernel_sizes, strides, expand_scales, se_scales
+        for key, value in base_config.__dict__.items():
+            setattr(self, key, value)
+            
+            if key == "num_layers":
+                self.num_layers = self.scale_and_round_layers(self.num_layers, depth_scale)
+
+            if key == "channels":
+                self.channels = self.scale_and_round_channels(self.channels, width_scale)
+            
 
         self.__dict__.pop("resolution")  # remove `resolution` for `EfficientNet`
         self.train_resolution = train_resolution
         self.eval_resolution = eval_resolution
 
-        if up_sampling_mode:
-            self.up_sampling = partial(nn.functional.interpolate, mode=up_sampling_mode)
-
-        self.return_feature_maps = return_feature_maps
-
 
 class EfficientNetV2Backbone(EfficientNetV2Base):
     def __init__(
         self,
+        base_config: EfficientNetV2BaseConfig,
         image_channel: int,
         depth_scale: float,
         width_scale: float,
@@ -68,17 +67,18 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
         se_scale: float = 0.25,
         batch_norm_eps: float = 1e-3,
         batch_norm_momentum: float = 0.99,
-        return_feature_map: bool = False,
+        return_feature_maps: bool = False,
         path_dropout: float = 0.2,  # From: https://github.com/google/automl/blob/master/efficientnetv2/hparams.py#L234, and it doesn't be overrided later.
     ) -> None:
         super().__init__(
+            base_config,
             depth_scale,
             width_scale,
             train_resolution,
             eval_resolution,
-            up_sampling_mode,
-            return_feature_map,
-            se_scale,
+            se_scale=se_scale,
+            up_sampling_mode=up_sampling_mode,
+            return_feature_maps=return_feature_maps,
         )
 
         kwargs = {}
@@ -88,78 +88,54 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
         kwargs["act_fnc_name"] = act_fnc_name
         kwargs["se_act_fnc_name"] = se_act_fnc_name
 
-        self.stage_0 = self._build_stage("0", **kwargs,
-            in_channel=image_channel,
-            out_channel=self.channels[0],
-            kernel_size=self.kernel_sizes[0]
-        )
-        self.stage_1 = self._build_stage("1", **kwargs)
-        self.stage_2 = self._build_stage("2", **kwargs)
-        self.stage_3 = self._build_stage("3", **kwargs)
-        self.stage_4 = self._build_stage("4", **kwargs)
-        self.stage_5 = self._build_stage("5", **kwargs)
-        self.stage_6 = self._build_stage("6", **kwargs)
-        self.stage_7 = self._build_stage("7", **kwargs,
-            in_channel=self.channels[-2],
-            out_channel=self.channels[-1],
-            kernel_size=self.kernel_sizes[-1]
-        )
-
+        num_stages = len(self.num_layers)
+        self.stages = nn.ModuleList([
+            self._build_stage(  # The first and last stages
+                stage_idx,
+                **kwargs,
+                in_channel=image_channel if stage_idx == 0 else self.channels[-2],
+                out_channel=self.channels[0 if stage_idx == 0 else -1],
+                kernel_size=self.kernel_sizes[0 if stage_idx == 0 else -1]
+            ) if stage_idx == 0 or stage_idx == (num_stages - 1) else self._build_stage(  # Stages in between
+                stage_idx,
+                **kwargs
+            )
+            for stage_idx in range(num_stages)
+        ])
+            
     def forward(self, x: torch.Tensor) -> Union[
         Tuple[torch.Tensor, Dict[str, torch.Tensor]],
         torch.Tensor
     ]:
         # These `if` statements should be removed after scripting, so don't worry
-        if self.up_sampling:
-            x = self.up_sampling(
+        if self.up_sampling_mode:
+            x = nn.functional.interpolate(
                 x,
-                size=self.train_resolution if self.training else self.eval_resolution
+                size=self.train_resolution if self.training else self.eval_resolution,
+                mode=self.up_sampling_mode,
             )
 
         if self.return_feature_maps:
             feature_maps = {}
 
-        x = self.stage_0(x)
-        x = self.stage_1(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_0'] = x
-
-        x = self.stage_2(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_1'] = x
-
-        x = self.stage_3(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_2'] = x
-
-        x = self.stage_4(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_3'] = x
-
-        x = self.stage_5(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_4'] = x
-
-        x = self.stage_6(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_5'] = x
+        for stage_idx, stage in enumerate(self.stages):
+            x = stage(x)
             
-        x - self.stage_7(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_6'] = x
-
+            if self.return_feature_maps and self.strides[stage_idx] == 2:  # If be asked to return the feature map and H and W shrink
+                feature_maps[f"stage_{stage_idx}"] = x
+        print(self.return_feature_maps)
         return (x, feature_maps) if self.return_feature_maps else x
 
-    def _build_stage(self, stage_idx: str, **kwargs) -> nn.Module:
-        stage_idx = int(stage_idx)
+    def _build_stage(self, stage_idx: int, **kwargs) -> nn.Module:
+        num_stages = len(self.num_layers)
 
-        if 0 < stage_idx and stage_idx < 7:  # If it's Stage 1 ~ 6
+        if 0 < stage_idx and stage_idx < (num_stages - 1):
             path_dropout = kwargs.pop("path_dropout")
-            conv_block = FusedMBConvXd if self.use_fused_MBConv[stage_idx] else MBConvXd
+            conv_block = FusedMBConvXd if self.se_scales[stage_idx] is None else MBConvXd
 
             return nn.Sequential(OrderedDict([
                 (
-                    f"layer_{idx}",
+                    f"stage_{stage_idx}_layer_{idx}",
                     conv_block(
                         in_channel=self.channels[stage_idx - 1] if idx == 0 else self.channels[stage_idx],
                         out_channel=self.channels[stage_idx],
@@ -170,7 +146,7 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
                         padding=self.kernel_sizes[stage_idx] // 2,
                         se_scale=self.se_scales[stage_idx],
                         # Inverted `survival_prob` from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_model.py#L659
-                        path_dropout=path_dropout*(stage_idx + 1) / len(self.num_layers),
+                        path_dropout=path_dropout*(stage_idx + 1) / num_stages,
                         **kwargs
                     ) 
                 ) for idx in range(self.num_layers[stage_idx])
@@ -179,7 +155,7 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
         else:
             return nn.Sequential(OrderedDict([
                 (
-                    f"layer_0",
+                    f"stage_{stage_idx}_layer_0",
                     nn.Sequential(
                         nn.Conv2d(
                             kwargs['in_channel'],

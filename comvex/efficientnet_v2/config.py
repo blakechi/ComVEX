@@ -114,7 +114,7 @@ class EfficientNetV2Config(ConfigBase):
         se_scale: float = 0.25,
         batch_norm_eps: float = 1e-3,
         batch_norm_momentum: float = 0.99,
-        return_feature_map: bool = False,
+        return_feature_maps: bool = False,
         path_dropout: float = 0.2,
         ff_dropout: float = 0.,
     ) -> None:
@@ -133,7 +133,7 @@ class EfficientNetV2Config(ConfigBase):
         self.se_scale = se_scale
         self.batch_norm_eps = batch_norm_eps
         self.batch_norm_momentum = batch_norm_momentum
-        self.return_feature_map = return_feature_map
+        self.return_feature_maps = return_feature_maps
         self.path_dropout = path_dropout
         self.ff_dropout = ff_dropout
 
@@ -207,6 +207,7 @@ class EfficientNetV2Config(ConfigBase):
             1.0,
             1.0,
             224,
+            224,
             num_classes=num_classes,
             ff_dropout=0.2,
             **kwargs,
@@ -219,6 +220,7 @@ class EfficientNetV2Config(ConfigBase):
             3,
             1.1,
             1.0,
+            240,
             240,
             num_classes=num_classes,
             ff_dropout=0.2,
@@ -233,6 +235,7 @@ class EfficientNetV2Config(ConfigBase):
             1.2,
             1.1,
             260,
+            260,
             num_classes=num_classes,
             ff_dropout=0.3,
             **kwargs,
@@ -245,6 +248,7 @@ class EfficientNetV2Config(ConfigBase):
             3,
             1.4,
             1.2,
+            300,
             300,
             num_classes=num_classes,
             ff_dropout=0.3,

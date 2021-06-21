@@ -44,7 +44,7 @@ class EfficientNetBase(nn.Module):
         self.resolution = resolution
         # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/preprocessing.py#L88
         # The default for resizing is `bicubic`
-        self.up_sampling = nn.Upsample(self.resolution, mode=up_sampling_mode) if up_sampling_mode else None
+        self.up_sampling_mode = up_sampling_mode
         self.return_feature_maps = return_feature_maps
 
     def scale_and_round_layers(self, in_list: List[int], scale) -> List[int]:
@@ -331,7 +331,7 @@ class EfficientNetBackbone(EfficientNetBase):
         # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_builder.py#L187-L188
         batch_norm_eps: float = 1e-3,
         batch_norm_momentum: float = 0.99,
-        return_feature_map: bool = False,
+        return_feature_maps: bool = False,
         # Can be overrided here in `EfficientNet`: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/main.py#L256
         # But from `EfficientNetV2`: https://github.com/google/automl/blob/master/efficientnetv2/hparams.py#L234, it's 0.2 and doesn't be overrided later.
         path_dropout: float = 0.2,
@@ -340,9 +340,9 @@ class EfficientNetBackbone(EfficientNetBase):
             depth_scale,
             width_scale,
             resolution,
-            up_sampling_mode,
-            return_feature_map,
-            se_scale
+            se_scale=se_scale,
+            up_sampling_mode=up_sampling_mode,
+            return_feature_maps=return_feature_maps,
         )
 
         kwargs = {}
@@ -375,8 +375,12 @@ class EfficientNetBackbone(EfficientNetBase):
         torch.Tensor
     ]:
         # These `if` statements should be removed after scripting, so don't worry
-        if self.up_sampling:
-            x = self.up_sampling(x)
+        if self.up_sampling_mode:
+            x = nn.functional.interpolate(
+                x,
+                size=self.resolution,
+                mode=self.up_sampling_mode
+            )
 
         if self.return_feature_maps:
             feature_maps = {}
