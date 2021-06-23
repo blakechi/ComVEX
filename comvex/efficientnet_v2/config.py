@@ -26,7 +26,7 @@ class EfficientNetV2BaseConfig(ConfigBase):
         kernel_sizes: List[int],
         strides: List[int],
         expand_scales: List[Optional[int]],
-        se_scales: List[Optional[int]],
+        se_scales: List[Optional[float]],
     ) -> None:
 
         self.name = name

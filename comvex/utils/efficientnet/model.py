@@ -1,9 +1,13 @@
-from typing import Optional, Union, List, Tuple, Dict, Literal
+from typing import Optional, Union, List, Dict, Literal
 from collections import OrderedDict
 import math
 
 import torch
 from torch import nn
+try:
+    from typing_extensions import Final
+except:
+    from torch.jit import Final
 
 from comvex.utils import PathDropout, XXXConvXdBase
 from comvex.utils.helpers import name_with_msg, get_attr_if_exists, config_pop_argument
@@ -11,16 +15,14 @@ from .config import EfficientNetConfig
 
 
 class EfficientNetBase(nn.Module):
-    __constants__ = [
-        "num_layers",
-        "channels",
-        "kernel_sizes",
-        "strides",
-        "expand_scales",
-        "se_scales",
-        "resolution",
-        "return_feature_maps",
-    ]
+    num_layers: Final[List[int]]
+    channels: Final[List[int]]
+    kernel_sizes: Final[List[int]]
+    strides: Final[List[int]]
+    expand_scales: Final[List[Optional[int]]]
+    se_scales: Final[List[Optional[float]]]
+    resolution: Final[int]
+    return_feature_maps: Final[bool]
 
     def __init__(
         self,
@@ -47,6 +49,7 @@ class EfficientNetBase(nn.Module):
         self.up_sampling_mode = up_sampling_mode
         self.return_feature_maps = return_feature_maps
 
+    @torch.jit.ignore
     def scale_and_round_layers(self, in_list: List[int], scale) -> List[int]:
         out = list(map(lambda x: int(math.ceil(x*scale)), in_list))
         out[0] = 1  # Stage 1 always has one layer
@@ -54,6 +57,7 @@ class EfficientNetBase(nn.Module):
         
         return out
 
+    @torch.jit.ignore
     def scale_and_round_channels(self, in_list: List[int], scale) -> List[int]:
         r"""
         Reference from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_model.py#L106
@@ -169,6 +173,8 @@ class MBConvXd(XXXConvXdBase):
     
     Note: `Swish` is called `SiLU` in PyTorch
     """
+
+    skip: Final[bool]
 
     def __init__(
         self, 
@@ -286,10 +292,10 @@ class MBConvXd(XXXConvXdBase):
         self.path_dropout = PathDropout(path_dropout)
         self.skip = True if self.in_channel == self.out_channel and stride == 1 else False
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
 
         # expansion head
-        res = self.expansion_head(x)
+        res: torch.Tensor = self.expansion_head(x)
 
         # SE block
         if self.se_block is not None:
@@ -304,6 +310,7 @@ class MBConvXd(XXXConvXdBase):
         return x + res if self.skip else res
 
     @classmethod
+
     def MBConv2d6k3(cls, in_channel: int, out_channel: int, **kwargs) -> "MBConvXd":
         r"""
         The MBConv6 (k3x3) from MnasNet (https://arxiv.org/pdf/1807.11626.pdf)
@@ -372,7 +379,7 @@ class EfficientNetBackbone(EfficientNetBase):
         )
 
     def forward(self, x: torch.Tensor) -> Union[
-        Tuple[torch.Tensor, Dict[str, torch.Tensor]],
+        Dict[str, torch.Tensor],
         torch.Tensor
     ]:
         # These `if` statements should be removed after scripting, so don't worry
@@ -384,7 +391,7 @@ class EfficientNetBackbone(EfficientNetBase):
             )
 
         if self.return_feature_maps:
-            feature_maps = {}
+            feature_maps: Dict[str, torch.Tensor] = {}
 
         x = self.stage_1(x)
         x = self.stage_2(x)
@@ -410,8 +417,9 @@ class EfficientNetBackbone(EfficientNetBase):
         if self.return_feature_maps:
             feature_maps['reduction_5'] = x
             
-        return (x, feature_maps) if self.return_feature_maps else x
+        return feature_maps if self.return_feature_maps else x
 
+    @torch.jit.ignore
     def _build_stage(self, stage_idx: str, **kwargs) -> nn.Module:
         access_idx = int(stage_idx) - 1  # Since the naming of stages is not 0-based
         num_stages = len(self.num_layers)
@@ -461,6 +469,7 @@ class EfficientNetBackbone(EfficientNetBase):
                 )
             ]))
 
+    @torch.jit.ignore
     def num_parameters(self) -> int:
         return sum(params.numel() for _, params in self.named_parameters())
 
@@ -479,14 +488,16 @@ class EfficientNetWithLinearClassifier(EfficientNetBackbone):
         )
 
     def forward(self, x: torch.Tensor) -> Union[
-        Tuple[torch.Tensor, Dict[str, torch.Tensor]],
+        Dict[str, torch.Tensor],
         torch.Tensor
     ]:
-        b, *rest = x.shape
+        b = x.shape[0]
+
         if self.return_feature_maps:
-            x, feature_maps = super().forward(x)
+            feature_maps: Dict[str, torch.Tensor] = super().forward(x)
+            x: torch.Tensor = feature_maps['reduction_5']
         else:
-            x = super().forward(x)
+            x: torch.Tensor = super().forward(x)
 
         # (B, C, H, W) -> (B, C, 1, 1) -> (B, C), avoid einops here now for scripting, edit it when einops is scriptable
         x = self.pooler(x).view(b, -1)
@@ -494,5 +505,5 @@ class EfficientNetWithLinearClassifier(EfficientNetBackbone):
         x = self.ff_dropout(x)
         x = self.proj_head(x)
 
-        return (x, feature_maps) if self.return_feature_maps else x
+        return { "x": x, **feature_maps } if self.return_feature_maps else x
 

@@ -1,6 +1,6 @@
 # EfficientNetV2
 
-This is an PyTorch implementation of [EfficientNetV2: Smaller Models and Faster Training](https://arxiv.org/abs/2104.00298). For the official code, please check out [here](https://github.com/google/automl/tree/master/efficientnetv2). Progressive Learning is still under construction.
+This is an PyTorch implementation of [EfficientNetV2: Smaller Models and Faster Training](https://arxiv.org/abs/2104.00298). For the official code, please check out [here](https://github.com/google/automl/tree/master/efficientnetv2). Support `torch.jit.trace` now. Progressive Learning is still under construction.
 
 ## Objects
 
@@ -79,9 +79,18 @@ efficientnet_v2_backbone = EfficientNetV2Backbone(
 ```python
 from comvex.efficientnet_v2 import EfficientNetV2Config, EfficientNetV2WithLinearClassifier
 
-efficientnet_v2_config = EfficientNetV2Config.EfficientNetV2_S()
+efficientnet_v2_config = EfficientNetV2Config.EfficientNetV2_S(num_classes=10)
 efficientnet_v2 = EfficientNetV2WithLinearClassifier(efficientnet_v2_config)
-con
+```
+
+4. Tracing EfficientNetV2 (See its `demo.py`)
+
+```python
+import torch
+from comvex.efficientnet_v2 import EfficientNetV2Config, EfficientNetV2WithLinearClassifier
+
+efficientnet_v2_config = EfficientNetV2Config.EfficientNetV2_S(num_classes=10)
+efficientnet_v2 = torch.jit.trace(EfficientNetV2WithLinearClassifier(efficientnet_v2_config))
 ```
 
 ## Demo

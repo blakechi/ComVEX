@@ -1,12 +1,22 @@
 from typing import Optional
 
 from torch import nn
+try:
+    from typing_extensions import Final
+except:
+    from torch.jit import Final
 
 from comvex.utils.helpers import name_with_msg
 
 
 class XXXConvXdBase(nn.Module):
-    __constants__ = ["in_channel", "out_channel"]
+    r"""
+    A simple wrapper for determining the number of input/output channels
+    and which types (1, 2, 3D) of convolution layer would be used.
+    """
+
+    in_channel: Final[int]
+    out_channel: Final[int]
 
     def __init__(
         self,
