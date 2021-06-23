@@ -51,7 +51,7 @@ def test_scripting_or_tracing():
 
         x = torch.randn(input_shape)
         model = torch.jit.trace(EfficientNetV2WithLinearClassifier(config), x, strict=not to_reture_feature_maps)
-        out = model(x)
+        out = model(x)  # Use different batch size after tracing
 
         if to_reture_feature_maps:
             out = out['x']

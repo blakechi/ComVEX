@@ -19,9 +19,9 @@ FusedMBConvXd = partial(MBConvXd, expansion_head_type="fused")
 
 
 class EfficientNetV2Base(EfficientNetBase):
+    name: Final[str]
     train_resolution: Final[int]
     eval_resolution: Final[int]
-    return_feature_maps: bool
 
     def __init__(
         self,
@@ -34,27 +34,18 @@ class EfficientNetV2Base(EfficientNetBase):
         up_sampling_mode: Optional[str] = None,  # Not recommmand, should be done by `torchvision.transforms`
         return_feature_maps: bool = False,
     ) -> None:
-        # What if we don't init EfficientBEtBase but nn.Module only?
+        name = config_pop_argument(base_config, "name")
         super().__init__(
             depth_scale,
             width_scale,
             train_resolution,
-            se_scale=se_scale,
             up_sampling_mode=up_sampling_mode,
             return_feature_maps=return_feature_maps,
+            se_scale=se_scale,
+            **base_config.__dict__,
         )
 
-        # Table 4. from the official paper (all stages)
-        # set: num_layers, channels, kernel_sizes, strides, expand_scales, se_scales
-        for key, value in base_config.__dict__.items():
-            setattr(self, key, value)
-            
-            if key == "num_layers":
-                self.num_layers = self.scale_and_round_layers(self.num_layers, depth_scale)
-
-            if key == "channels":
-                self.channels = self.scale_and_round_channels(self.channels, width_scale)
-            
+        self.name = name
 
         self.__dict__.pop("resolution")  # remove `resolution` for `EfficientNet`
         self.train_resolution = train_resolution
@@ -62,6 +53,8 @@ class EfficientNetV2Base(EfficientNetBase):
 
 
 class EfficientNetV2Backbone(EfficientNetV2Base):
+    stages: Final[torch.nn.ModuleList]
+
     def __init__(
         self,
         base_config: EfficientNetV2BaseConfig,

@@ -29,19 +29,30 @@ class EfficientNetBase(nn.Module):
         depth_scale: float,
         width_scale: float,
         resolution: int,
-        se_scale: float = 0.25,
         up_sampling_mode: Optional[str] = None,  # Check out: https://pytorch.org/docs/stable/generated/torch.nn.Upsample.html?highlight=up%20sample#torch.nn.Upsample
         return_feature_maps: bool = False,
+        num_layers: Optional[List[int]] = None,
+        channels: Optional[List[int]] = None,
+        kernel_sizes: Optional[List[int]] = None,
+        strides: Optional[List[int]] = None,
+        expand_scales: Optional[List[Optional[int]]] = None,
+        se_scales: Optional[List[Optional[int]]] = None,
+        se_scale: Optional[float] = 0.25,
     ) -> None:
         super().__init__()
 
         # Table 1. from the official paper (all stages)
-        self.num_layers = self.scale_and_round_layers([1, 1, 2, 2, 3, 3, 4, 1, 1], depth_scale)
-        self.channels = self.scale_and_round_channels([32, 16, 24, 40, 80, 112, 192, 320, 1280], width_scale)
-        self.kernel_sizes = [3, 3, 3, 5, 3, 5, 5, 3, 1]    
-        self.strides = [1, 2, 1, 2, 2, 2, 1, 2, 1]
-        self.expand_scales = [None, 1, 6, 6, 6, 6, 6, 6, None]
-        self.se_scales = [None, *((se_scale,)*7), None]
+        self.num_layers = self.scale_and_round_layers(num_layers if num_layers is not None else [1, 1, 2, 2, 3, 3, 4, 1, 1], depth_scale)
+        self.channels = self.scale_and_round_channels(channels if channels is not None else [32, 16, 24, 40, 80, 112, 192, 320, 1280], width_scale)
+        self.kernel_sizes = kernel_sizes if kernel_sizes is not None else [3, 3, 3, 5, 3, 5, 5, 3, 1]    
+        self.strides = strides if strides is not None else [1, 2, 1, 2, 2, 2, 1, 2, 1]
+        self.expand_scales = expand_scales if expand_scales is not None else [None, 1, 6, 6, 6, 6, 6, 6, None]
+
+        assert (
+            se_scales is not None or se_scale is not None
+        ), name_with_msg("Either `se_scales` or `se_scale` should be specified")
+        
+        self.se_scales = se_scales if se_scales is not None else [None, *((se_scale,)*7), None]
 
         self.resolution = resolution
         # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/preprocessing.py#L88

@@ -49,3 +49,4 @@ Please check out the **Usage** section detailed in models' own `README.md`.
 
 - Continuously implementing models, please check them out under the `comvex` folder for more details and `examples` folder for some demos.
 - Pull requests are welcome!
+- From this [issue](https://github.com/pytorch/pytorch/issues/42885), inheritance doesn't support in `torchscript`. Therefore, most of our implementations aren't scriptable. But `trace` seems that doesn't exist this kind of issue and we will use `trace` as our default and gradually update our code to make **ComVEX** a trace-supported library.
