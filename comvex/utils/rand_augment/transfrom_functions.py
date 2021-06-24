@@ -66,7 +66,7 @@ def translate_y(
     pixels = int((magnitude / max_magnitude)*interval)
     pixels = _to_negative(pixels)
 
-    return TF.affine(x, angle=0., translate=[0, fraction], shear=[0., 0.], scale=1., fill=[fill,])
+    return TF.affine(x, angle=0., translate=[0, pixels], shear=[0., 0.], scale=1., fill=[fill,])
 
 
 @_random_apply

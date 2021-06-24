@@ -1,2 +1,1 @@
-from .rand_augment import RandAugment
-from .config import RandAugmentConfig
+from .mixup import MixUp
