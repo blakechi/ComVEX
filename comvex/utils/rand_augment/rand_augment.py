@@ -69,6 +69,9 @@ class RandAugment(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         
+        if not self.training:
+            return x
+            
         transform_funcs_indice: List[int] = self.transform_func_distribution.multinomial(num_samples=self.n).tolist()
         for idx in transform_funcs_indice:
             x = self.transform_funcs[idx](x)
