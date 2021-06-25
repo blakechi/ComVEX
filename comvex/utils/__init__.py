@@ -3,7 +3,7 @@ from .config_base import ConfigBase
 from .convolution import XXXConvXdBase
 from .dropout import TokenWiseDropout, TokenDropout, PathDropout
 from .efficientnet import EfficientNetBase, SeperateConvXd, MBConvXd, EfficientNetBackbone, EfficientNetWithLinearClassifier, EfficientNetConfig
-from .layer_scale import AffineTransform, LayerScaleBlock
+from .layer_scale import AffineTransform, LayerScale
 from .mixup import MixUp
 from .multihead_attention import MultiheadAttention
 from .rand_augment import RandAugment, RandAugmentConfig
@@ -18,7 +18,7 @@ __all__ = [
     "XXXConvXdBase",
     "TokenWiseDropout", "TokenDropout", "PathDropout",
     "EfficientNetBase", "SeperateConvXd", "MBConvXd", "EfficientNetBackbone", "EfficientNetWithLinearClassifier", "EfficientNetConfig",
-    "AffineTransform", "LayerScaleBlock",
+    "AffineTransform", "LayerScale",
     "MixUp",
     "MultiheadAttention",
     "RandAugment", "RandAugmentConfig",

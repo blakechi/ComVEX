@@ -23,7 +23,7 @@ class AffineTransform(nn.Module):
         return self.alpha*x + self.beta if self.beta is not None else self.alpha*x
 
 
-class LayerScaleBlock(AffineTransform):
+class LayerScale(AffineTransform):
     r"""
     Layer Scale from CaiT (Figure 1 (d)): https://arxiv.org/abs/2103.17239
 
