@@ -21,7 +21,6 @@ expected_shape = (1, 1000)
 kwargs = {}
 kwargs['num_classes'] = 1000
 kwargs['up_sampling_mode'] = 'bicubic'
-kwargs['return_feature_maps'] = False
 official_num_params = []  # skipped
 
 # === Test Cases ===
@@ -41,6 +40,28 @@ def test_forward():
     
         del model
         gc.collect()
+
+
+def test_scripting_or_tracing():
+    spec = specializations[0]  # one is enough
+    print(spec)
+
+    for to_reture_feature_maps in [True, False]:
+        config = getattr(EfficientNetV2Config, spec)(**kwargs, return_feature_maps=to_reture_feature_maps)
+
+        x = torch.randn(input_shape)
+        model = torch.jit.trace(EfficientNetV2WithLinearClassifier(config), x, strict=not to_reture_feature_maps)
+        out = model(x)  # Use different batch size after tracing
+
+        if to_reture_feature_maps:
+            out = out['x']
+
+        assert_output_shape_wrong(out, expected_shape)
+        assert_output_has_nan(out)
+
+        del model
+        gc.collect()
+
 
 @pytest.mark.skipif(True, reason="skip until find the why the number of parameters doesn't match with the official one.")
 def test_num_parameters():

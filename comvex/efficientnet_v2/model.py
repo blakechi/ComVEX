@@ -1,9 +1,14 @@
 from functools import partial
-from collections import OrderedDict
-from typing import Optional, Union, Tuple, Dict
+from collections import OrderedDict, namedtuple
+from os import name
+from typing import Optional, Union, Dict, NamedTuple
 
 import torch
 from torch import nn
+try:
+    from typing_extensions import Final
+except:
+    from torch.jit import Final
 
 from comvex.utils import EfficientNetBase, MBConvXd
 from comvex.utils.helpers import get_attr_if_exists, config_pop_argument
@@ -14,6 +19,10 @@ FusedMBConvXd = partial(MBConvXd, expansion_head_type="fused")
 
 
 class EfficientNetV2Base(EfficientNetBase):
+    name: Final[str]
+    train_resolution: Final[int]
+    eval_resolution: Final[int]
+
     def __init__(
         self,
         base_config: EfficientNetV2BaseConfig,
@@ -25,27 +34,18 @@ class EfficientNetV2Base(EfficientNetBase):
         up_sampling_mode: Optional[str] = None,  # Not recommmand, should be done by `torchvision.transforms`
         return_feature_maps: bool = False,
     ) -> None:
-        # What if we don't init EfficientBEtBase but nn.Module only?
+        name = config_pop_argument(base_config, "name")
         super().__init__(
             depth_scale,
             width_scale,
             train_resolution,
-            se_scale=se_scale,
             up_sampling_mode=up_sampling_mode,
             return_feature_maps=return_feature_maps,
+            se_scale=se_scale,
+            **base_config.__dict__,
         )
 
-        # Table 4. from the official paper (all stages)
-        # set: num_layers, channels, kernel_sizes, strides, expand_scales, se_scales
-        for key, value in base_config.__dict__.items():
-            setattr(self, key, value)
-            
-            if key == "num_layers":
-                self.num_layers = self.scale_and_round_layers(self.num_layers, depth_scale)
-
-            if key == "channels":
-                self.channels = self.scale_and_round_channels(self.channels, width_scale)
-            
+        self.name = name
 
         self.__dict__.pop("resolution")  # remove `resolution` for `EfficientNet`
         self.train_resolution = train_resolution
@@ -53,6 +53,8 @@ class EfficientNetV2Base(EfficientNetBase):
 
 
 class EfficientNetV2Backbone(EfficientNetV2Base):
+    stages: Final[torch.nn.ModuleList]
+
     def __init__(
         self,
         base_config: EfficientNetV2BaseConfig,
@@ -104,7 +106,7 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
         ])
             
     def forward(self, x: torch.Tensor) -> Union[
-        Tuple[torch.Tensor, Dict[str, torch.Tensor]],
+        Dict[str, torch.Tensor],
         torch.Tensor
     ]:
         # These `if` statements should be removed after scripting, so don't worry
@@ -116,16 +118,18 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
             )
 
         if self.return_feature_maps:
-            feature_maps = {}
+            feature_maps: Dict[str, torch.Tensor] = {}
 
         for stage_idx, stage in enumerate(self.stages):
             x = stage(x)
-            
-            if self.return_feature_maps and self.strides[stage_idx] == 2:  # If be asked to return the feature map and H and W shrink
+
+            # If be asked to return the feature map and (H and W shrink, or it's the last stage)
+            if self.return_feature_maps and (self.strides[stage_idx] == 2 or stage_idx == (len(self.stages) - 1)):
                 feature_maps[f"stage_{stage_idx}"] = x
 
-        return (x, feature_maps) if self.return_feature_maps else x
+        return feature_maps if self.return_feature_maps else x
 
+    @torch.jit.ignore
     def _build_stage(self, stage_idx: int, **kwargs) -> nn.Module:
         num_stages = len(self.num_layers)
 
@@ -174,6 +178,7 @@ class EfficientNetV2Backbone(EfficientNetV2Base):
                 )
             ]))
 
+    @torch.jit.ignore
     def num_parameters(self) -> int:
         return sum(params.numel() for _, params in self.named_parameters())
 
@@ -182,10 +187,14 @@ class EfficientNetV2WithLinearClassifier(EfficientNetV2Backbone):
     r"""
     Same as `EfficientNetV2WithLinearClassifier` with different parent and config classes
     """
+    last_stage_name: Final[str]
+
     def __init__(self, config: EfficientNetV2Config = None) -> None:
         ff_dropout = config_pop_argument(config, "ff_dropout")
         num_classes = config_pop_argument(config, "num_classes")
         super().__init__(**config.__dict__)
+
+        self.last_stage_name = f"stage_{len(self.stages) - 1}"
 
         self.pooler = nn.AdaptiveAvgPool2d((1, 1))
         self.ff_dropout = nn.Dropout(ff_dropout)
@@ -195,14 +204,16 @@ class EfficientNetV2WithLinearClassifier(EfficientNetV2Backbone):
         )
 
     def forward(self, x: torch.Tensor) -> Union[
-        Tuple[torch.Tensor, Dict[str, torch.Tensor]],
+        Dict[str, torch.Tensor],
         torch.Tensor
     ]:
-        b, *rest = x.shape
+        b: int = x.shape[0]
+
         if self.return_feature_maps:
-            x, feature_maps = super().forward(x)
+            feature_maps: Dict[str, torch.Tensor] = super().forward(x)
+            x: torch.Tensor = feature_maps[self.last_stage_name]
         else:
-            x = super().forward(x)
+            x: torch.Tensor = super().forward(x)
 
         # (B, C, H, W) -> (B, C, 1, 1) -> (B, C), avoid einops here now for scripting, edit it when einops is scriptable
         x = self.pooler(x).view(b, -1)
@@ -210,4 +221,10 @@ class EfficientNetV2WithLinearClassifier(EfficientNetV2Backbone):
         x = self.ff_dropout(x)
         x = self.proj_head(x)
 
-        return (x, feature_maps) if self.return_feature_maps else x
+        if self.return_feature_maps:
+            return {
+                "x": x,
+                **feature_maps
+            }
+
+        return x

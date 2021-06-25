@@ -4,7 +4,9 @@ from .convolution import XXXConvXdBase
 from .dropout import TokenWiseDropout, TokenDropout, PathDropout
 from .efficientnet import EfficientNetBase, SeperateConvXd, MBConvXd, EfficientNetBackbone, EfficientNetWithLinearClassifier, EfficientNetConfig
 from .layer_scale import AffineTransform, LayerScaleBlock
+from .mixup import MixUp
 from .multihead_attention import MultiheadAttention
+from .rand_augment import RandAugment, RandAugmentConfig
 from .resnet import ResNetBlockBase, ResNetBlock, ResNetBottleneckBlock, ResNetFullPreActivationBlock, ResNetFullPreActivationBottleneckBlock, ResNetBackBone, ResNetWithLinearClassifier, ResNetConfig
 from .unet import UNetBase, UNetConvBlock, UNetEncoder, UNetDecoder, UNet
 
@@ -17,7 +19,9 @@ __all__ = [
     "TokenWiseDropout", "TokenDropout", "PathDropout",
     "EfficientNetBase", "SeperateConvXd", "MBConvXd", "EfficientNetBackbone", "EfficientNetWithLinearClassifier", "EfficientNetConfig",
     "AffineTransform", "LayerScaleBlock",
+    "MixUp",
     "MultiheadAttention",
+    "RandAugment", "RandAugmentConfig",
     "ResNetBlockBase", "ResNetBlock", "ResNetBottleneckBlock", "ResNetFullPreActivationBlock", "ResNetFullPreActivationBottleneckBlock", "ResNetBackBone", "ResNetWithLinearClassifier", "ResNetConfig",
     "UNetBase", "UNetConvBlock", "UNetEncoder", "UNetDecoder", "UNet",
 ]
