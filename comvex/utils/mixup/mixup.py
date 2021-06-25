@@ -49,13 +49,13 @@ class MixUp(nn.Module):
         
         return out
 
-    def get_loss(self, criterion: nn.Module, y_pred: torch.Tensor) -> torch.Tensor:
+    def get_loss(self, criterion: nn.Module, y_logit: torch.Tensor) -> torch.Tensor:
         r"""
         Don't forget to call this function after forward propagations.
         Will reset the cache after getting the loss.
         """
 
-        loss = self.loss(criterion, y_pred, self.y, self.y_perm, self.lambda_scale)
+        loss = self.loss(criterion, y_logit, self.y, self.y_perm, self.lambda_scale)
         self.reset_cache()
 
         return loss
@@ -85,9 +85,9 @@ class MixUp(nn.Module):
     @staticmethod
     def loss(
         criterion: nn.Module,
-        y_pred: torch.Tensor,
+        y_logit: torch.Tensor,
         y: torch.Tensor,
         y_perm: torch.Tensor,
         lambda_scale: float
     ) -> torch.Tensor:
-        return lambda_scale*criterion(y_pred, y) + (1. - lambda_scale)*criterion(y_pred, y_perm)
+        return lambda_scale*criterion(y_logit, y) + (1. - lambda_scale)*criterion(y_logit, y_perm)
