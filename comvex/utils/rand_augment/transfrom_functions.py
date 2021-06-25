@@ -7,7 +7,7 @@ import torch
 from torchvision.transforms import functional as TF
 
 
-def _to_negative(factor: int) -> int:
+def _to_negative(factor: float) -> float:
     return -factor if torch.rand(1) > 0.5 else factor
 
 
@@ -47,8 +47,9 @@ def translate_x(
 ) -> torch.Tensor:
 
     # Differ from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/autoaugment.py#L503-L507
-    pixels = int((magnitude / max_magnitude)*interval)
-    pixels = _to_negative(pixels)
+    width = x.shape[-1]
+    pixels = width*(magnitude / max_magnitude)*interval
+    pixels = int(_to_negative(pixels))
 
     return TF.affine(x, angle=0., translate=[pixels, 0], shear=[0., 0.], scale=1., fill=[fill,])
 
@@ -63,8 +64,9 @@ def translate_y(
 ) -> torch.Tensor:
 
     # Differ from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/autoaugment.py#L503-L507
-    pixels = int((magnitude / max_magnitude)*interval)
-    pixels = _to_negative(pixels)
+    height = x.shape[-2]
+    pixels = height*(magnitude / max_magnitude)*interval
+    pixels = int(_to_negative(pixels))
 
     return TF.affine(x, angle=0., translate=[0, pixels], shear=[0., 0.], scale=1., fill=[fill,])
 

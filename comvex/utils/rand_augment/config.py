@@ -10,8 +10,8 @@ class RandAugmentConfig(ConfigBase):
         self,
         max_magnitude: int = 10,
         rotate_interval: float = 30.,  # degree
-        translate_x_interval: int = 250,  # pixel
-        translate_y_interval: int = 250,  # pixel
+        translate_x_interval: float = 0.45,  # portion of image's width
+        translate_y_interval: float = 0.45,  # portion of image's height
         sheer_x_interval: float = 0.3,   # portion of angle (0 ~ 180)
         sheer_y_interval: float = 0.3,   # portion of angle (0 ~ 180)
         crop_out_interval: int = 100,  # The longest lateral length (pixels) for cropping
