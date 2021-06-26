@@ -1,131 +1,201 @@
+from typing import Optional
+
 from comvex.utils import ConfigBase
 
 
-class ConViTConfig(ConfigBase):
+class CaiTConfig(ConfigBase):
     def __init__(
         self,
-        image_size: int, 
-        image_channel: int, 
+        image_size: int,
+        image_channel: int,
         patch_size: int,
-        num_local_layers: int,
-        num_nonlocal_layers: int,
+        self_attn_depth: int,
+        cls_attn_depth: int,
         dim: int,
+        alpha: float,
         num_classes: int,
-        locality_strength=None,
-        heads=None,
-        head_dim=None,
-        pre_norm=False,
-        ff_dim=None,                    # If not specify, ff_dim = 4*dim
-        ff_dropout=0.0,
-        attention_dropout: float = 0.0,
-        token_dropout: float = 0.0,
+        heads: Optional[int] = None,
+        ff_expand_scale: int = 4,
+        ff_dropout: float = 0.,
+        token_dropout: float = 0.,
+        attention_dropout: float = 0.,
+        path_dropout: float = 0.,
         pred_act_fnc_name: str = "ReLU",
     ) -> None:
+        super().__init__()
 
         self.image_size = image_size
         self.image_channel = image_channel
         self.patch_size = patch_size
-        self.num_local_layers = num_local_layers
-        self.num_nonlocal_layers = num_nonlocal_layers
+        self.self_attn_depth = self_attn_depth
+        self.cls_attn_depth = cls_attn_depth
         self.dim = dim
-        self.num_classes = num_classes 
-        self.locality_strength = locality_strength 
-        self.heads = heads 
-        self.head_dim = head_dim 
-        self.pre_norm = pre_norm 
-        self.ff_dim = ff_dim 
-        self.ff_dropout = ff_dropout 
-        self.attention_dropout = attention_dropout
+        self.heads = heads
+        self.alpha = alpha
+        self.num_classes = num_classes
+        self.ff_expand_scale = ff_expand_scale
+        self.ff_dropout = ff_dropout
         self.token_dropout = token_dropout
+        self.attention_dropout = attention_dropout
+        self.path_dropout = path_dropout
         self.pred_act_fnc_name = pred_act_fnc_name
 
     @classmethod
-    def ConViT_Ti(cls, num_classes, **kwargs) -> "ConViTConfig":
+    def CaiT_XXS_24(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            224,
+            image_size,
             3,
             16,
-            10,
+            24,
             2,
             192,
+            4,
+            1e-5,
+            path_dropout=0.05,
             num_classes=num_classes,
-            locality_strength=1.0,
-            heads=4,
             **kwargs
         )
 
     @classmethod
-    def ConViT_Ti_plus(cls, num_classes, **kwargs) -> "ConViTConfig":
+    def CaiT_XXS_36(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            224,
+            image_size,
             3,
             16,
-            10,
+            36,
             2,
             192,
+            4,
+            1e-6,
+            path_dropout=0.1,
             num_classes=num_classes,
-            locality_strength=1.0,
-            heads=4,
             **kwargs
         )
-        
+
     @classmethod
-    def ConViT_S(cls, num_classes, **kwargs) -> "ConViTConfig":
+    def CaiT_XS_24(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            224,
+            image_size,
             3,
             16,
-            10,
+            24,
             2,
-            432,
+            288,
+            6,
+            1e-5,
+            path_dropout=0.05,
             num_classes=num_classes,
-            locality_strength=1.0,
-            heads=9,
             **kwargs
         )
-        
+
     @classmethod
-    def ConViT_S_plus(cls, num_classes, **kwargs) -> "ConViTConfig":
+    def CaiT_XS_36(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            224,
+            image_size,
             3,
             16,
-            10,
+            36,
             2,
-            576,
+            288,
+            6,
+            1e-6,
+            path_dropout=0.1,
             num_classes=num_classes,
-            locality_strength=1.0,
-            heads=9,
             **kwargs
         )
-        
+
     @classmethod
-    def ConViT_B(cls, num_classes, **kwargs) -> "ConViTConfig":
+    def CaiT_S_24(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            224,
+            image_size,
             3,
             16,
-            10,
+            24,
+            2,
+            384,
+            8,
+            1e-5,
+            path_dropout=0.1,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def CaiT_S_36(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+        return cls(
+            image_size,
+            3,
+            16,
+            36,
+            2,
+            384,
+            8,
+            1e-6,
+            path_dropout=0.2,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def CaiT_S_48(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+        return cls(
+            image_size,
+            3,
+            16,
+            48,
+            2,
+            384,
+            8,
+            1e-6,
+            path_dropout=0.3,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def CaiT_M_24(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+        return cls(
+            image_size,
+            3,
+            16,
+            24,
             2,
             768,
+            16,
+            1e-5,
+            path_dropout=0.2,
             num_classes=num_classes,
-            locality_strength=1.0,
-            heads=16,
             **kwargs
         )
-        
+
     @classmethod
-    def ConViT_B_plus(cls, num_classes, **kwargs) -> "ConViTConfig":
+    def CaiT_M_36(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            224,
+            image_size,
             3,
             16,
-            10,
+            36,
             2,
-            1024,
+            768,
+            16,
+            1e-6,
+            path_dropout=0.3,
             num_classes=num_classes,
-            locality_strength=1.0,
-            heads=16,
             **kwargs
         )
-        
+
+    @classmethod
+    def CaiT_M_48(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+        return cls(
+            image_size,
+            3,
+            16,
+            48,
+            2,
+            768,
+            16,
+            1e-6,
+            path_dropout=0.4,
+            num_classes=num_classes,
+            **kwargs
+        )

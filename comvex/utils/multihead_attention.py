@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 from torch import nn, einsum
 from einops import rearrange, repeat
@@ -61,17 +63,91 @@ class MultiheadAttention(nn.Module):
             q, k, v = map(lambda proj: proj(x), (self.Q, self.K, self.V))
 
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (q, k, v))
+        k = k*self.scale
 
-        similarity = einsum("b h n d, b h m d -> b h n m", q, k)*self.scale  # m=n
+        attention = einsum("b h n d, b h m d -> b h n m", q, k)
 
         if attention_mask is not None:
             attention_mask = repeat(attention_mask, "b 1 n m -> b h n m", h=h)
-            similarity.masked_fill_(attention_mask, self.mask_value)
+            attention.masked_fill_(attention_mask, self.mask_value)
 
-        similarity = similarity.softmax(dim=-1)
-        similarity = self.attention_dropout(similarity)
+        attention = attention.softmax(dim=-1)
+        attention = self.attention_dropout(attention)
         
-        out = einsum("b h n m, b h m d -> b h n d", similarity, v)
+        out = einsum("b h n m, b h m d -> b h n d", attention, v)
+        out = rearrange(out, "b h n d -> b n (h d)")
+        out = self.out_linear(out)
+
+        return self.out_dropout(out)
+
+
+class TalkingHeadAttention(nn.Module):
+    r"""
+    Talking-Heads Attention (https://arxiv.org/pdf/2003.02436v1.pdf) 
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        heads: int,
+        heads_k: int = None,
+        heads_v: int = None,
+        head_dim: int = None,  # Unified head dimension for query, key, and value tokens
+        attention_dropout: float = 0.,
+        ff_dropout: float = 0.,
+        dtype = torch.float32,
+    ) -> None:
+        
+        self.head_dim = head_dim or dim // heads
+        self.heads = heads
+        self.heads_k = heads_k or heads
+        self.heads_v = heads_v or heads
+
+        self.Q = nn.Linear(dim, self.head_dim*self.heads_k, bias=False)
+        self.K = nn.Linear(dim, self.head_dim*self.heads_k, bias=False)
+        self.V = nn.Linear(dim, self.head_dim*self.heads_v, bias=False)
+
+        self.L = nn.Conv2d(heads_k, heads, kernel_size=1, bias=False)  # Attention Logit Projection
+        self.W = nn.Conv2d(heads, heads_v, kernel_size=1, bias=False)  # Attention Weight Projection
+
+        self.out = nn.Linear(self.head_dim*self.heads_v, dim)
+
+        self.attention_dropout = nn.Dropout2d(attention_dropout)
+        self.out_dropout = nn.Dropout(ff_dropout)
+
+        self.scale = head_dim ** (-0.5)
+        self.mask_value = -torch.finfo(dtype).max  # pytorch default float type
+
+    def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Args:
+            x (b, n, d) or ((b, n, d), (b, n, d), (b, n, d)): input tensors, if its a list, the order represents (q, k, v)
+            attention_mask (b n m): Use True or 1 to mask out attention weights and False or 0 for opposite.
+        """
+        h_k, h, h_v = self.heads_k, self.heads, self.heads_v
+        
+        if isinstance(x, tuple):
+            q, k, v = x[0], x[1], x[2]
+        else:
+            q, k, v = x, x, x
+
+        q, k, v = self.Q(q), self.K(k), self.V(v)
+        q = rearrange(q, "b n (h d) -> b h n d", h=h_k)
+        k = rearrange(q, "b n (h d) -> b h n d", h=h_k)*self.scale
+        v = rearrange(q, "b n (h d) -> b h n d", h=h_v)
+
+        attention = einsum("b h n d, b h m d -> b h n m", q, k)
+        attention = self.L(attention)
+
+        if attention_mask is not None:
+            attention_mask = repeat(attention_mask, "b 1 n m -> b h n m", h=h)
+            attention.masked_fill_(attention_mask, self.mask_value)
+
+        attention = attention.softmax(dim=-1)
+        attention = self.W(attention)
+        attention = self.attention_dropout(attention)
+        
+        out = einsum("b h n m, b h m d -> b h n d", attention, v)
         out = rearrange(out, "b h n d -> b n (h d)")
         out = self.out_linear(out)
 

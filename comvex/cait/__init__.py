@@ -1,2 +1,2 @@
-from .model import GatedPositionalSelfAttention, ConViTLayer, ConViTBackbone, ConViTWithLinearClassifier
-from .config import ConViTConfig
+from .model import ClassAttention, ClassAttentionLayer, SelfAttentionLayer, CaiTBackbone, CaiTWithLinearClassifier
+from .config import CaiTConfig
