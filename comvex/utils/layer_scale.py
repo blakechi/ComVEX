@@ -40,12 +40,10 @@ class LayerScale(AffineTransform):
     ) -> None:
         super().__init__(dim, alpha=alpha, beta=None)
 
-        self.core = nn.Sequential(
-            pre_norm(dim) if issubclass(pre_norm, nn.Module) else getattr(nn, pre_norm)(dim),
-            core_block(dim, **kwargs) if issubclass(core_block, nn.Module) else getattr(nn, core_block)(dim, **kwargs)
-        )
+        self.pre_norm = pre_norm(dim) if not isinstance(pre_norm, str) and issubclass(pre_norm, nn.Module) else getattr(nn, pre_norm)(dim)
+        self.core_block = core_block(dim, **kwargs) if not isinstance(core_block, str) and issubclass(core_block, nn.Module) else getattr(nn, core_block)(dim, **kwargs)
         self.path_dropout = PathDropout(path_dropout)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x + self.path_dropout(super().forward(self.core(x)))
+    def forward(self, x: torch.Tensor, *other_inputs) -> torch.Tensor:
+        return x + self.path_dropout(super().forward(self.core_block(self.pre_norm(x), *other_inputs)))
         

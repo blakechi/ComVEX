@@ -54,19 +54,18 @@ class MultiheadAttention(nn.Module):
             x (b, n, d) or ((b, n, d), (b, n, d), (b, n, d)): input tensors, if its a list, the order represents (q, k, v)
             attention_mask (b n m): Use True or 1 to mask out attention weights and False or 0 for opposite.
         """
+        h = self.heads
         
         if isinstance(x, tuple):
-            b, n, d, h = *x[0].shape, self.heads
             q, k, v = map(lambda proj_token_pair: proj_token_pair[0](proj_token_pair[1]), zip((self.Q, self.K, self.V), x))
         else:
-            b, n, d, h = *x.shape, self.heads
             q, k, v = map(lambda proj: proj(x), (self.Q, self.K, self.V))
 
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (q, k, v))
         k = k*self.scale
 
         attention = einsum("b h n d, b h m d -> b h n m", q, k)
-
+        print(attention.shape)
         if attention_mask is not None:
             attention_mask = repeat(attention_mask, "b 1 n m -> b h n m", h=h)
             attention.masked_fill_(attention_mask, self.mask_value)
@@ -77,7 +76,7 @@ class MultiheadAttention(nn.Module):
         out = einsum("b h n m, b h m d -> b h n d", attention, v)
         out = rearrange(out, "b h n d -> b n (h d)")
         out = self.out_linear(out)
-
+        print("out:", out.shape)
         return self.out_dropout(out)
 
 
@@ -95,27 +94,29 @@ class TalkingHeadAttention(nn.Module):
         head_dim: int = None,  # Unified head dimension for query, key, and value tokens
         attention_dropout: float = 0.,
         ff_dropout: float = 0.,
+        use_bias=False,
         dtype = torch.float32,
     ) -> None:
-        
+        super().__init__()
+
         self.head_dim = head_dim or dim // heads
         self.heads = heads
         self.heads_k = heads_k or heads
         self.heads_v = heads_v or heads
 
-        self.Q = nn.Linear(dim, self.head_dim*self.heads_k, bias=False)
-        self.K = nn.Linear(dim, self.head_dim*self.heads_k, bias=False)
-        self.V = nn.Linear(dim, self.head_dim*self.heads_v, bias=False)
+        self.Q = nn.Linear(dim, self.head_dim*self.heads_k, bias=use_bias)
+        self.K = nn.Linear(dim, self.head_dim*self.heads_k, bias=use_bias)
+        self.V = nn.Linear(dim, self.head_dim*self.heads_v, bias=use_bias)
 
-        self.L = nn.Conv2d(heads_k, heads, kernel_size=1, bias=False)  # Attention Logit Projection
-        self.W = nn.Conv2d(heads, heads_v, kernel_size=1, bias=False)  # Attention Weight Projection
+        self.L = nn.Conv2d(self.heads_k, self.heads, kernel_size=1, bias=False)  # Attention Logit Projection
+        self.W = nn.Conv2d(self.heads, self.heads_v, kernel_size=1, bias=False)  # Attention Weight Projection
 
-        self.out = nn.Linear(self.head_dim*self.heads_v, dim)
+        self.out_linear = nn.Linear(self.head_dim*self.heads_v, dim)
 
         self.attention_dropout = nn.Dropout2d(attention_dropout)
         self.out_dropout = nn.Dropout(ff_dropout)
 
-        self.scale = head_dim ** (-0.5)
+        self.scale = self.head_dim ** (-0.5)
         self.mask_value = -torch.finfo(dtype).max  # pytorch default float type
 
     def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
@@ -133,8 +134,8 @@ class TalkingHeadAttention(nn.Module):
 
         q, k, v = self.Q(q), self.K(k), self.V(v)
         q = rearrange(q, "b n (h d) -> b h n d", h=h_k)
-        k = rearrange(q, "b n (h d) -> b h n d", h=h_k)*self.scale
-        v = rearrange(q, "b n (h d) -> b h n d", h=h_v)
+        k = rearrange(k, "b n (h d) -> b h n d", h=h_k)*self.scale
+        v = rearrange(v, "b n (h d) -> b h n d", h=h_v)
 
         attention = einsum("b h n d, b h m d -> b h n m", q, k)
         attention = self.L(attention)

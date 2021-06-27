@@ -41,15 +41,14 @@ class CaiTConfig(ConfigBase):
         self.pred_act_fnc_name = pred_act_fnc_name
 
     @classmethod
-    def CaiT_XXS_24(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_XXS_24(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             24,
             2,
             192,
-            4,
             1e-5,
             path_dropout=0.05,
             num_classes=num_classes,
@@ -57,15 +56,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_XXS_36(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_XXS_36(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             36,
             2,
             192,
-            4,
             1e-6,
             path_dropout=0.1,
             num_classes=num_classes,
@@ -73,15 +71,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_XS_24(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_XS_24(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             24,
             2,
             288,
-            6,
             1e-5,
             path_dropout=0.05,
             num_classes=num_classes,
@@ -89,15 +86,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_XS_36(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_XS_36(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             36,
             2,
             288,
-            6,
             1e-6,
             path_dropout=0.1,
             num_classes=num_classes,
@@ -105,15 +101,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_S_24(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_S_24(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             24,
             2,
             384,
-            8,
             1e-5,
             path_dropout=0.1,
             num_classes=num_classes,
@@ -121,15 +116,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_S_36(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_S_36(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             36,
             2,
             384,
-            8,
             1e-6,
             path_dropout=0.2,
             num_classes=num_classes,
@@ -137,15 +131,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_S_48(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_S_48(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             48,
             2,
             384,
-            8,
             1e-6,
             path_dropout=0.3,
             num_classes=num_classes,
@@ -153,15 +146,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_M_24(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_M_24(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             24,
             2,
             768,
-            16,
             1e-5,
             path_dropout=0.2,
             num_classes=num_classes,
@@ -169,15 +161,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_M_36(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_M_36(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             36,
             2,
             768,
-            16,
             1e-6,
             path_dropout=0.3,
             num_classes=num_classes,
@@ -185,15 +176,14 @@ class CaiTConfig(ConfigBase):
         )
 
     @classmethod
-    def CaiT_M_48(cls, image_size: int, num_classes: int, **kwargs) -> "CaiTConfig":
+    def CaiT_M_48(cls, num_classes: int, **kwargs) -> "CaiTConfig":
         return cls(
-            image_size,
+            224,
             3,
             16,
             48,
             2,
             768,
-            16,
             1e-6,
             path_dropout=0.4,
             num_classes=num_classes,

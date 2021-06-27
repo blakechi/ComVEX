@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 from collections import OrderedDict
 
 import torch
@@ -28,9 +28,9 @@ class ClassAttention(nn.Module):
             ff_dropout=ff_dropout
         )
 
-    def forward(self, cls_token, x):
+    def forward(self, cls_token, x) -> torch.Tensor:
         z = torch.cat([cls_token, x], dim=1)
-        
+
         return self.attn((cls_token, z, z))
         
 
@@ -47,31 +47,27 @@ class ClassAttentionLayer(nn.Module):
         super().__init__()
 
         self.attn_block = LayerScale(
-            core_block=ClassAttention(
-                dim,
-                ff_dropout=ff_dropout,
-                **kwargs
-            ),
             dim=dim,
             alpha=alpha,
-            path_dropout=path_dropout
+            core_block=ClassAttention,
+            path_dropout=path_dropout,
+            **kwargs
         )
 
         self.ff_block = LayerScale(
-            core_block=MLP(
-                dim, 
-                hidden_dim=dim*ff_expand_scale,
-                ff_dropout=ff_dropout,
-            ),
+            dim=dim,
             alpha=alpha,
-            path_dropout=path_dropout
+            core_block=MLP,
+            hidden_dim=dim*ff_expand_scale,
+            ff_dropout=ff_dropout,
+            path_dropout=path_dropout,
         )
 
     def forward(self, cls_token, x):
-        cls_token = self.attn_block(cls_token, x)
-        cls_token = self.ff_block(cls_token)
+        out = self.attn_block(cls_token, x)
+        out = self.ff_block(out)
 
-        return cls_token
+        return out
 
 
 class SelfAttentionLayer(nn.Module):
@@ -90,24 +86,20 @@ class SelfAttentionLayer(nn.Module):
         super().__init__()
 
         self.attn_block = LayerScale(
-            core_block=TalkingHeadAttention(
-                dim,
-                ff_dropout=ff_dropout,
-                **kwargs
-            ),
+            core_block=TalkingHeadAttention,
             dim=dim,
             alpha=alpha,
-            path_dropout=path_dropout
+            path_dropout=path_dropout,
+            **kwargs
         )
 
         self.ff_block = LayerScale(
-            core_block=MLP(
-                dim, 
-                hidden_dim=dim*ff_expand_scale,
-                ff_dropout=ff_dropout,
-            ),
+            core_block=MLP,
+            dim=dim,
             alpha=alpha,
-            path_dropout=path_dropout
+            hidden_dim=dim*ff_expand_scale,
+            ff_dropout=ff_dropout,
+            path_dropout=path_dropout,
         )
 
     def forward(self, x):
@@ -158,20 +150,17 @@ class CaiTBackbone(ViTBase):
             ) for idx in range(self_attn_depth)
         ]))
 
-        self.cls_attn_layers = nn.Sequential(OrderedDict([
-            (
-                f"cls_attn_layer_{idx}",
-                ClassAttentionLayer(
-                    dim=dim,
-                    heads=heads,
-                    alpha=alpha,
-                    ff_expand_scale=ff_expand_scale,
-                    ff_dropout=ff_dropout,
-                    path_dropout=path_dropout,
-                    attention_dropout=attention_dropout,
-                )
-            ) for idx in range(cls_attn_depth)
-        ]))
+        self.cls_attn_layers = nn.ModuleList([
+            ClassAttentionLayer(
+                dim=dim,
+                heads=heads,
+                alpha=alpha,
+                ff_expand_scale=ff_expand_scale,
+                ff_dropout=ff_dropout,
+                path_dropout=path_dropout,
+                attention_dropout=attention_dropout,
+            ) for _ in range(cls_attn_depth)
+        ])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         b = x.shape[0]  # b, c, h, w = x.shape 
@@ -186,14 +175,15 @@ class CaiTBackbone(ViTBase):
         x = self.token_dropout(x)
 
         # Expand CLS token ann add position code
-        CLS = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
+        cls_token = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
         x = x + self.position_code
         
         # Self-Attention Layers
         x = self.self_attn_layers(x)
         
         # Classe Attention Layers
-        cls_token = self.cls_attn_layers(CLS, x)
+        for cls_layer in self.cls_attn_layers:
+            cls_token = cls_layer(cls_token, x)
 
         return cls_token
 
@@ -211,6 +201,8 @@ class CaiTWithLinearClassifier(CaiTBackbone):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        cls_token = super().forward(x)
+        b = x.shape[0]
         
+        cls_token = super().forward(x).view(b, -1)
+
         return self.proj_head(cls_token)
