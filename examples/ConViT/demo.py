@@ -6,20 +6,13 @@ sys.path.insert(0, os.getcwd())
 import torch 
 
 from comvex.convit import ConViTConfig, ConViTWithLinearClassifier
-from comvex.cait import CaiTConfig, CaiTWithLinearClassifier
 
 if __name__ == "__main__":
 
-
-    convit_config = CaiTConfig.CaiT_XXS_24(num_classes=1000)
-    convit = CaiTWithLinearClassifier(convit_config)
+    convit_config = ConViTConfig.ConViT_B(num_classes=1000, token_dropout=0.2)
+    convit = ConViTWithLinearClassifier(convit_config)
 
     print(convit)
-
-    # convit_config = ConViTConfig.ConViT_B(num_classes=1000, token_dropout=0.2)
-    # convit = ConViTWithLinearClassifier(convit_config)
-
-    # print(convit)
 
     x = torch.randn(1, 3, 224, 224)
 
