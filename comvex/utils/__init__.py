@@ -6,6 +6,7 @@ from .efficientnet import EfficientNetBase, SeperateConvXd, MBConvXd, EfficientN
 from .layer_scale import AffineTransform, LayerScale
 from .mixup import MixUp
 from .multihead_attention import MultiheadAttention, TalkingHeadAttention
+from .position_encodings import PositionEncodingFourier
 from .rand_augment import RandAugment, RandAugmentConfig
 from .resnet import ResNetBlockBase, ResNetBlock, ResNetBottleneckBlock, ResNetFullPreActivationBlock, ResNetFullPreActivationBottleneckBlock, ResNetBackBone, ResNetWithLinearClassifier, ResNetConfig
 from .unet import UNetBase, UNetConvBlock, UNetEncoder, UNetDecoder, UNet
@@ -21,6 +22,7 @@ __all__ = [
     "AffineTransform", "LayerScale",
     "MixUp",
     "MultiheadAttention", "TalkingHeadAttention",
+    "PositionEncodingFourier",
     "RandAugment", "RandAugmentConfig",
     "ResNetBlockBase", "ResNetBlock", "ResNetBottleneckBlock", "ResNetFullPreActivationBlock", "ResNetFullPreActivationBottleneckBlock", "ResNetBackBone", "ResNetWithLinearClassifier", "ResNetConfig",
     "UNetBase", "UNetConvBlock", "UNetEncoder", "UNetDecoder", "UNet",

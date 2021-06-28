@@ -66,7 +66,7 @@ class MultiheadAttention(nn.Module):
         k = k*self.scale
 
         attention = einsum("b h n d, b h m d -> b h n m", q, k)
-        print(attention.shape)
+
         if attention_mask is not None:
             attention_mask = repeat(attention_mask, "b 1 n m -> b h n m", h=h)
             attention.masked_fill_(attention_mask, self.mask_value)
@@ -77,7 +77,7 @@ class MultiheadAttention(nn.Module):
         out = einsum("b h n m, b h m d -> b h n d", attention, v)
         out = rearrange(out, "b h n d -> b n (h d)")
         out = self.out_linear(out)
-        
+
         return self.out_dropout(out)
 
 

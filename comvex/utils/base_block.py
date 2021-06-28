@@ -4,7 +4,7 @@ from typing import Optional
 import torch
 from torch import nn
 
-from comvex.utils.helpers.functions import name_with_msg
+from comvex.utils.helpers.functions import get_act_fnc, get_conv_layer, name_with_msg
 from .dropout import PathDropout
 
 
@@ -22,6 +22,7 @@ class Residual(nn.Module):
             return x[0] + self.path_dropout(self._fn(x, *args, **kwargs))  # assume the first element is the main hidden state
         else:
             return x + self.path_dropout(self._fn(x, *args, **kwargs))
+
 
 # TODO: Refine it!!
 class LayerNorm(nn.Module):
@@ -99,12 +100,12 @@ class FeedForward(nn.Module):
                 0 < use_convXd and use_convXd < 4
             ), name_with_msg(f"`use_convXd` must be 1, 2, or 3 for valid `ConvXd` supported by PyTorch. But got: {use_convXd}")
 
-            core = partial(getattr(nn, f"Conv{use_convXd}d"), kernel_size=1)
+            core = partial(get_conv_layer(f"Conv{use_convXd}d"), kernel_size=1)
         else:
             core = nn.Linear
 
         self.ff_0 = core(in_dim, expand_dim)
-        self.act_fnc = getattr(nn, act_fnc_name)()
+        self.act_fnc = get_act_fnc(act_fnc_name)()
         self.dropout = nn.Dropout(ff_dropout)
         self.ff_1 = core(expand_dim, out_dim)
 
@@ -126,7 +127,7 @@ class ProjectionHead(nn.Module):
 
         self.head = nn.Sequential(  
             nn.Linear(dim, dim),
-            getattr(nn, act_fnc_name)(),
+            get_act_fnc(act_fnc_name)(),
             nn.LayerNorm(dim),
             nn.Linear(dim, out_dim),
         )
