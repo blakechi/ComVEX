@@ -20,7 +20,7 @@ class TransformerEncoderLayer(nn.Module):
         self.ff_block = LayerNorm(
             Residual(
                 FeedForward(
-                    in_dim=dim, expand_dim=ff_dim if ff_dim is not None else 4*dim, **kwargs
+                    dim, expand_dim=ff_dim if ff_dim is not None else 4*dim, **kwargs
                 )
             ),
             dim=dim,
