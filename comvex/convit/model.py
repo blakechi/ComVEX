@@ -137,7 +137,7 @@ class ConViTLayer(nn.Module):
         self.ff_block = LayerNorm(
             Residual(
                 FeedForward(
-                    dim=dim, hidden_dim=ff_dim if ff_dim is not None else 4*dim, **kwargs
+                    dim=dim, expand_dim=ff_dim if ff_dim is not None else 4*dim, **kwargs
                 )
             ),
             dim=dim,

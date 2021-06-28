@@ -1,6 +1,10 @@
+from functools import partial
+from typing import Optional
+
 import torch
 from torch import nn
 
+from comvex.utils.helpers.functions import name_with_msg
 from .dropout import PathDropout
 
 
@@ -69,40 +73,50 @@ class MaskLayerNorm(LayerNorm):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dim_scale=None, ff_dropout=0.0, act_fnc_name="GELU", useNorm=False, **kwargs):
+    r"""
+    Feed-Forward Layer
+
+    Support 1x1 convolution for 1, 2, and 3D data
+    """
+    def __init__(
+        self,
+        in_dim: int,
+        out_dim: Optional[int] = None,
+        expand_dim: Optional[int] = None,
+        ff_expand_scale: Optional[int] = None,
+        ff_dropout: float = 0.0,
+        act_fnc_name: str = "GELU",
+        use_convXd: Optional[int] = None,
+        **rest
+    ) -> None:
         super().__init__()
-        assert dim is not None, f"[{self.__class__.__name__}] Must specify the input dim"
-        if hidden_dim is None:
-            assert ff_dim_scale is not None, f"[{self.__class__.__name__}] Must specify `ff_dim_scale` when `hidden_dim` doesn't exist"
+        
+        expand_dim = expand_dim or ff_expand_scale*in_dim if (expand_dim is not None) and (ff_expand_scale is not None) else in_dim
+        out_dim = out_dim or in_dim
 
-        hidden_dim = hidden_dim if hidden_dim is not None else ff_dim_scale*dim
-        out_dim = output_dim if output_dim is not None else dim
+        if use_convXd:
+            assert (
+                0 < use_convXd and use_convXd < 4
+            ), name_with_msg(f"`use_convXd` must be 1, 2, or 3 for valid `ConvXd` supported by PyTorch. But got: {use_convXd}")
 
-        if useNorm:
-            self._net = nn.Sequential(
-                LayerNorm(
-                    nn.Sequential(
-                        nn.Linear(dim, hidden_dim),
-                        nn.Dropout(ff_dropout),
-                    ),
-                    dim=dim
-                ),
-                getattr(nn, act_fnc_name)(),
-                LayerNorm(
-                    nn.Linear(hidden_dim, out_dim),
-                    dim=hidden_dim
-                ),
-            )
+            core = partial(getattr(nn, f"Conv{use_convXd}d"), kernel_size=1)
         else:
-            self._net = nn.Sequential(
-                nn.Linear(dim, hidden_dim),
-                getattr(nn, act_fnc_name)(),
-                nn.Dropout(ff_dropout),
-                nn.Linear(hidden_dim, out_dim),
-            )
+            core = nn.Linear
 
-    def forward(self, x):
-        return self._net(x)
+        self.ff_0 = core(in_dim, expand_dim)
+        self.act_fnc = getattr(nn, act_fnc_name)()
+        self.dropout = nn.Dropout(ff_dropout)
+        self.ff_1 = core(expand_dim, out_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.ff_0(x)
+        x = self.act_fnc(x)
+        x = self.dropout(x)
+        x = self.ff_1(x)
+
+        return x
+
+MLP = FeedForward
 
 
 # Reference from: https://github.com/huggingface/transformers/blob/master/src/transformers/models/bert/modeling_bert.py#L642
@@ -119,19 +133,3 @@ class ProjectionHead(nn.Module):
 
     def forward(self, x):
         return self.head(x)
-
-
-class MLP(nn.Module):
-    def __init__(self, dim, hidden_dim, act_fnc_name="GELU", ff_dropout=0.):
-        super().__init__()
-
-        self._net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.Dropout(ff_dropout),
-            getattr(nn, act_fnc_name)(),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(ff_dropout)
-        )
-
-    def forward(self, x):
-        return self._net(x)

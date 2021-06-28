@@ -8,15 +8,16 @@ from einops import rearrange, repeat
 class MultiheadAttention(nn.Module):
     def __init__(
         self, 
-        in_dim, 
+        in_dim: int, 
         *,
-        heads=None, 
-        kv_dim=None, 
-        head_dim=None, 
-        proj_dim=None,
-        out_dim=None,
-        attention_dropout=0.0, 
-        ff_dropout=0.0, 
+        heads: int = None, 
+        kv_dim: int = None, 
+        head_dim: int = None, 
+        proj_dim: int = None,
+        out_dim: int = None,
+        attention_dropout: bool = 0.0, 
+        ff_dropout: bool = 0.0, 
+        use_bias: bool = False,
         dtype=torch.float32, 
         **rest
     ):
@@ -36,9 +37,9 @@ class MultiheadAttention(nn.Module):
             head_dim * self.heads == dim
         ), f"[{self.__class__.__name__}] Head dimension times the number of heads must be equal to embedding dimension (`in_dim` or `proj_dim`)"
         
-        self.Q = nn.Linear(in_dim, dim, bias=False)
-        self.K = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=False)
-        self.V = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=False)
+        self.Q = nn.Linear(in_dim, dim, bias=use_bias)
+        self.K = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=use_bias)
+        self.V = nn.Linear(kv_dim if kv_dim is not None else in_dim, dim, bias=use_bias)
         self.out_linear = nn.Linear(dim, out_dim)
 
         # Reference from`BertSelfAttention` (https://huggingface.co/transformers/_modules/transformers/models/bert/modeling_bert.html#BertModel)
@@ -76,7 +77,7 @@ class MultiheadAttention(nn.Module):
         out = einsum("b h n m, b h m d -> b h n d", attention, v)
         out = rearrange(out, "b h n d -> b n (h d)")
         out = self.out_linear(out)
-        print("out:", out.shape)
+        
         return self.out_dropout(out)
 
 
@@ -108,8 +109,8 @@ class TalkingHeadAttention(nn.Module):
         self.K = nn.Linear(dim, self.head_dim*self.heads_k, bias=use_bias)
         self.V = nn.Linear(dim, self.head_dim*self.heads_v, bias=use_bias)
 
-        self.L = nn.Conv2d(self.heads_k, self.heads, kernel_size=1, bias=False)  # Attention Logit Projection
-        self.W = nn.Conv2d(self.heads, self.heads_v, kernel_size=1, bias=False)  # Attention Weight Projection
+        self.L = nn.Conv2d(self.heads_k, self.heads, kernel_size=1, bias=False)  # Attention Logit Projection, no bias due to attention masks
+        self.W = nn.Conv2d(self.heads, self.heads_v, kernel_size=1, bias=False)  # Attention Weight Projection, no bias due to attention masks
 
         self.out_linear = nn.Linear(self.head_dim*self.heads_v, dim)
 

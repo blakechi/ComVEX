@@ -40,7 +40,7 @@ class PerceiverBlock(nn.Module):
                 dim=dim,
                 use_pre_norm=pre_norm,
                 fn=Residual(
-                    fn=FeedForward(dim=dim, hidden_dim=ff_dim_scale*dim, **kwargs)
+                    fn=FeedForward(dim=dim, expand_dim=ff_dim_scale*dim, **kwargs)
                 )
             )
         ])
@@ -56,7 +56,7 @@ class PerceiverBlock(nn.Module):
                 ),
                 LayerNorm(
                     fn=Residual(
-                        fn=FeedForward(dim=dim, hidden_dim=ff_dim_scale*dim, **kwargs)
+                        fn=FeedForward(dim=dim, expand_dim=ff_dim_scale*dim, **kwargs)
                     ),
                     dim=dim,
                     use_pre_norm=pre_norm,

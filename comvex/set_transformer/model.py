@@ -1,3 +1,4 @@
+from math import exp
 import torch
 from torch import nn
 from einops import repeat
@@ -7,7 +8,7 @@ from comvex.utils import Residual, LayerNorm, FeedForward, MultiheadAttention
 
 class MAB(nn.Module):
     def __init__(
-        self, *, dim, heads, ff_dim_scale=4, pre_norm=False, **kwargs
+        self, *, dim, heads, ff_expand_scale=4, pre_norm=False, **kwargs
     ):
         super().__init__()
 
@@ -30,7 +31,7 @@ class MAB(nn.Module):
             fn=Residual(
                 fn=FeedForward(
                     dim=dim, 
-                    hidden_dim=ff_dim_scale*dim, 
+                    expand_dim=ff_expand_scale*dim, 
                     **kwargs
                 )
             ),
@@ -44,7 +45,7 @@ class MAB(nn.Module):
 
 class SAB(nn.Module):
     def __init__(
-        self, *, dim, heads, ff_dim_scale=4, pre_norm=False, **kwargs
+        self, *, dim, heads, ff_expand_scale=4, pre_norm=False, **kwargs
     ):
         super().__init__()
 
@@ -65,7 +66,7 @@ class SAB(nn.Module):
             fn=Residual(
                 fn=FeedForward(
                     dim=dim, 
-                    hidden_dim=ff_dim_scale*dim, 
+                    expand_dim=ff_expand_scale*dim, 
                     **kwargs
                 )
             ),
@@ -86,7 +87,7 @@ class ISAB(nn.Module):
         num_inducing_points, 
         attention_dropout=0.0, 
         ff_dropout=0.0, 
-        ff_dim_scale=4, 
+        ff_expand_scale=4, 
         pre_norm=False, 
         head_dim=None,
         **kwargs
@@ -110,7 +111,7 @@ class ISAB(nn.Module):
             head_dim=head_dim,
             attention_dropout=attention_dropout,
             ff_dropout=ff_dropout,
-            ff_dim_scale=ff_dim_scale,
+            ff_expand_scale=ff_expand_scale,
             pre_norm=pre_norm
         )
         self.second_MAB = MAB(
@@ -119,7 +120,7 @@ class ISAB(nn.Module):
             head_dim=head_dim,
             attention_dropout=attention_dropout,
             ff_dropout=ff_dropout,
-            ff_dim_scale=ff_dim_scale,
+            ff_expand_scale=ff_expand_scale,
             pre_norm=pre_norm
         )
 
@@ -142,7 +143,7 @@ class PMA(nn.Module):
         heads, 
         num_seeds=1, 
         attention_dropout=0.0, 
-        ff_dim_scale=4, 
+        ff_expand_scale=4, 
         pre_norm=False, 
         head_dim=None,
         **kwargs
@@ -165,13 +166,13 @@ class PMA(nn.Module):
             heads=self.heads,
             head_dim=head_dim,
             attention_dropout=attention_dropout,
-            ff_dim_scale=ff_dim_scale,
+            ff_expand_scale=ff_expand_scale,
             pre_norm=pre_norm,
             **kwargs
         )
         self.ff = FeedForward(
             dim=dim, 
-            hidden_dim=dim, 
+            expand_dim=dim, 
             **kwargs
         )
 
@@ -218,7 +219,7 @@ class SetTransformer(nn.Module):
         num_seeds, 
         attention_dropout=0.0, 
         ff_dropout=0.0, 
-        ff_dim_scale=4, 
+        ff_expand_scale=4, 
         pre_norm=False, 
         head_dim=None
     ):
@@ -231,7 +232,7 @@ class SetTransformer(nn.Module):
             num_inducing_points=num_inducing_points, 
             attention_dropout=attention_dropout, 
             ff_dropout=ff_dropout, 
-            ff_dim_scale=ff_dim_scale, 
+            ff_expand_scale=ff_expand_scale, 
             pre_norm=pre_norm, 
             head_dim=head_dim
         )
@@ -241,7 +242,7 @@ class SetTransformer(nn.Module):
             num_seeds=num_seeds, 
             attention_dropout=attention_dropout, 
             ff_dropout=ff_dropout, 
-            ff_dim_scale=ff_dim_scale, 
+            ff_expand_scale=ff_expand_scale, 
             pre_norm=pre_norm, 
             head_dim=head_dim
         )
