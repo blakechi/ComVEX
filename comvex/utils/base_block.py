@@ -81,7 +81,7 @@ class FeedForward(nn.Module):
     """
     def __init__(
         self,
-        in_dim: int,
+        dim: int,
         out_dim: Optional[int] = None,
         expand_dim: Optional[int] = None,
         ff_expand_scale: Optional[int] = None,
@@ -92,8 +92,8 @@ class FeedForward(nn.Module):
     ) -> None:
         super().__init__()
         
-        expand_dim = expand_dim or ff_expand_scale*in_dim if (expand_dim is not None) and (ff_expand_scale is not None) else in_dim
-        out_dim = out_dim or in_dim
+        expand_dim = expand_dim or ff_expand_scale*dim if (expand_dim is not None) and (ff_expand_scale is not None) else dim
+        out_dim = out_dim or dim
 
         if use_convXd:
             assert (
@@ -104,7 +104,7 @@ class FeedForward(nn.Module):
         else:
             core = nn.Linear
 
-        self.ff_0 = core(in_dim, expand_dim)
+        self.ff_0 = core(dim, expand_dim)
         self.act_fnc = get_act_fnc(act_fnc_name)()
         self.dropout = nn.Dropout(ff_dropout)
         self.ff_1 = core(expand_dim, out_dim)

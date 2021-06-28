@@ -30,7 +30,7 @@ class MAB(nn.Module):
             use_pre_norm=pre_norm,
             fn=Residual(
                 fn=FeedForward(
-                    dim=dim, 
+                    dim, 
                     expand_dim=ff_expand_scale*dim, 
                     **kwargs
                 )
@@ -65,7 +65,7 @@ class SAB(nn.Module):
             use_pre_norm=pre_norm,
             fn=Residual(
                 fn=FeedForward(
-                    dim=dim, 
+                    dim, 
                     expand_dim=ff_expand_scale*dim, 
                     **kwargs
                 )
@@ -171,7 +171,7 @@ class PMA(nn.Module):
             **kwargs
         )
         self.ff = FeedForward(
-            dim=dim, 
+            dim, 
             expand_dim=dim, 
             **kwargs
         )
