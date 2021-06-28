@@ -18,7 +18,7 @@ class PerceiverBlock(nn.Module):
         heads, 
         latent_transformer_depth=1, 
         pre_norm=False, 
-        ff_dim_scale=4, 
+        ff_expand_scale=4, 
         **kwargs
     ):
         super().__init__()
@@ -40,7 +40,7 @@ class PerceiverBlock(nn.Module):
                 dim=dim,
                 use_pre_norm=pre_norm,
                 fn=Residual(
-                    fn=FeedForward(dim=dim, expand_dim=ff_dim_scale*dim, **kwargs)
+                    fn=FeedForward(dim, expand_dim=ff_expand_scale*dim, **kwargs)
                 )
             )
         ])
@@ -56,7 +56,7 @@ class PerceiverBlock(nn.Module):
                 ),
                 LayerNorm(
                     fn=Residual(
-                        fn=FeedForward(dim=dim, expand_dim=ff_dim_scale*dim, **kwargs)
+                        fn=FeedForward(dim, expand_dim=ff_expand_scale*dim, **kwargs)
                     ),
                     dim=dim,
                     use_pre_norm=pre_norm,
@@ -96,7 +96,7 @@ class Perceiver(nn.Module):
         frequency_base=2,
         pre_norm=False,
         ff_dim=None, 
-        ff_dim_scale=4, 
+        ff_expand_scale=4, 
         ff_dropout=0.0,
         attention_dropout=0.0,
         cross_kv_dim=None,
@@ -132,7 +132,7 @@ class Perceiver(nn.Module):
                 latent_transformer_depth=latent_depth,
                 pre_norm=pre_norm,
                 ff_dim=ff_dim, 
-                ff_dim_scale=ff_dim_scale,
+                ff_expand_scale=ff_expand_scale,
                 ff_dropout=ff_dropout,
                 attention_dropout=attention_dropout,
                 head_dim=head_dim
