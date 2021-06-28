@@ -74,7 +74,7 @@ class MaskLayerNorm(LayerNorm):
 
 class FeedForward(nn.Module):
     r"""
-    Feed-Forward Layer
+    Feed-Forward Layer (Alias: MLP)
 
     Support 1x1 convolution for 1, 2, and 3D data
     """
