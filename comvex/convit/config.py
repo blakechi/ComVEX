@@ -40,7 +40,7 @@ class ConViTConfig(ConfigBase):
         self.pred_act_fnc_name = pred_act_fnc_name
 
     @classmethod
-    def ConViT_Ti(cls, num_classes, **kwargs):
+    def ConViT_Ti(cls, num_classes, **kwargs) -> "ConViTConfig":
         return cls(
             224,
             3,
@@ -55,7 +55,7 @@ class ConViTConfig(ConfigBase):
         )
 
     @classmethod
-    def ConViT_Ti_plus(cls, num_classes, **kwargs):
+    def ConViT_Ti_plus(cls, num_classes, **kwargs) -> "ConViTConfig":
         return cls(
             224,
             3,
@@ -70,7 +70,7 @@ class ConViTConfig(ConfigBase):
         )
         
     @classmethod
-    def ConViT_S(cls, num_classes, **kwargs):
+    def ConViT_S(cls, num_classes, **kwargs) -> "ConViTConfig":
         return cls(
             224,
             3,
@@ -85,7 +85,7 @@ class ConViTConfig(ConfigBase):
         )
         
     @classmethod
-    def ConViT_S_plus(cls, num_classes, **kwargs):
+    def ConViT_S_plus(cls, num_classes, **kwargs) -> "ConViTConfig":
         return cls(
             224,
             3,
@@ -100,7 +100,7 @@ class ConViTConfig(ConfigBase):
         )
         
     @classmethod
-    def ConViT_B(cls, num_classes, **kwargs):
+    def ConViT_B(cls, num_classes, **kwargs) -> "ConViTConfig":
         return cls(
             224,
             3,
@@ -115,7 +115,7 @@ class ConViTConfig(ConfigBase):
         )
         
     @classmethod
-    def ConViT_B_plus(cls, num_classes, **kwargs):
+    def ConViT_B_plus(cls, num_classes, **kwargs) -> "ConViTConfig":
         return cls(
             224,
             3,

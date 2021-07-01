@@ -7,7 +7,6 @@ import torch
 
 from comvex.convit import ConViTConfig, ConViTWithLinearClassifier
 
-
 if __name__ == "__main__":
 
     convit_config = ConViTConfig.ConViT_B(num_classes=1000, token_dropout=0.2)

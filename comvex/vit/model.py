@@ -10,7 +10,7 @@ from .config import ViTConfig
 
 
 class ViTBase(nn.Module):
-    def __init__(self, image_size, image_channel, patch_size):
+    def __init__(self, image_size, image_channel, patch_size, use_patch_and_flat=True):
         super().__init__()
 
         assert image_size is not None, name_with_msg(self, "Please specify input images' size")
@@ -23,8 +23,9 @@ class ViTBase(nn.Module):
         assert (
             (self.num_patches**0.5) * patch_size == image_size
         ), name_with_msg(self, "Image size must be divided by the patch size")
-
-        self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
+        
+        if use_patch_and_flat:
+            self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
 
 
 class ViTBackbone(ViTBase):

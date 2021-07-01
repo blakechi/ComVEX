@@ -121,7 +121,7 @@ class ResNetFullPreActivationBlock(ResNetBlockBase):
         super().__init__(in_channel, out_channel, **kwargs)
 
         self.net = nn.Sequential(
-            self.Norm(out_channel),
+            self.Norm(in_channel),
             ReLU(),
             nn.Conv2d(
                 in_channel,

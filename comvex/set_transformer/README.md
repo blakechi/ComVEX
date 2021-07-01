@@ -25,7 +25,7 @@ set_transformer = SetTransformer(
     num_seeds=4,
     attention_dropout=0.0,
     ff_dropout=0.0,
-    ff_dim_scale=4,
+    ff_expand_scale=4,
     pre_norm=False,
     head_dim=None
 )

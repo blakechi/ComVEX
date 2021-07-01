@@ -1,4 +1,5 @@
-from typing import List, OrderedDict, Union
+from typing import List, Union
+from collections import OrderedDict
 
 import torch
 from torch import nn, einsum
@@ -203,7 +204,7 @@ class CoAtNetConvBlock(nn.Module):
             in_dim,
             out_dim,
             expand_scale=expand_scale,
-            first_pixel_wise_conv_stride=2 if use_downsampling else 1,
+            stride=2 if use_downsampling else 1,
             **kwargs
         )
         self.path_dropout = PathDropout(kwargs["path_dropout"] if "path_dropout" in kwargs else 0.)
@@ -315,6 +316,7 @@ class CoAtNetBackbone(CoAtNetBase):
     ) -> nn.Module:
         if block_type == "C":
             core_block = CoAtNetConvBlock
+            kwargs = {"path_dropout": kwargs.pop("path_dropout")}
         elif block_type == "T":
             core_block = CoAtNetTransformerBlock
         else:
