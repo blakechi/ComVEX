@@ -1,353 +1,331 @@
-from typing import List, Union
-from collections import OrderedDict
+from comvex.utils.base_block import FeedForward
+from typing import List, Dict, Optional
+from collections import OrderedDict, namedtuple
 
 import torch
 from torch import nn, einsum
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange, Reduce
 
-from comvex.utils import MBConvXd, MultiheadAttention, PathDropout, ProjectionHead
+from comvex.utils import PathDropout, ProjectionHead
 from comvex.utils.helpers import name_with_msg, config_pop_argument
-from .config import CoAtNetConfig
+from .config import CoaTConfig
 
 
-class CoAtNetBase(nn.Module):
-    def __init__(self, image_height, image_width, num_blocks_in_layers, num_channels_in_layers, block_type_in_layers, expand_scale_in_layers):
-        super().__init__()
-
-        assert (
-            len(num_blocks_in_layers) == 5
-        ), name_with_msg(self, "The length of `num_blocks_in_layers` must be 5")
-
-        if isinstance(num_channels_in_layers, list):
-            assert (
-                len(num_channels_in_layers) == 5
-            ), name_with_msg(self, "The length of `num_channels_in_layers` must be 5")
-        else:
-            begin_channel = int(num_channels_in_layers)
-            num_channels_in_layers = [int(begin_channel // (2**layer_idx)) for layer_idx in range(0, 5)]
-
-        # We ignore `S0` here, so the length of the below lists should be 4
-        assert (
-            len(block_type_in_layers) == 4
-        ), name_with_msg(self, "The length of `block_type_in_layers` must be 4")
-
-        if isinstance(expand_scale_in_layers, list):
-            assert (
-                len(expand_scale_in_layers) == 4
-            ), name_with_msg(self, "The length of `expand_scale_in_layers` must be 4")
-        else:
-            expand_scale = int(expand_scale_in_layers)
-            expand_scale_in_layers = [expand_scale for _ in range(4)]
-
-        self.height_in_layers = [int(image_height / (2**layer_idx)) for layer_idx in range(1, 6)]
-        self.width_in_layers = [int(image_width / (2**layer_idx)) for layer_idx in range(1, 6)]
-        self.num_blocks_in_layers = num_blocks_in_layers
-        self.num_channels_in_layers = num_channels_in_layers
-        self.block_type_in_layers = block_type_in_layers
-        self.expand_scale_in_layers = expand_scale_in_layers
+CoaTReturnType = namedtuple("CoaTRetureType", "x cls_token")
 
 
-class CoAtNetRelativeAttention(MultiheadAttention):
+class ConvolutionalPositionEncoding(nn.Module):
     def __init__(
         self,
-        pre_height: int,
-        pre_width: int,
-        in_dim: int,
-        proj_dim: int,
-        head_dim: int,
+        dim: int,
+        kernel_size: int = 3,
+    ) -> None:
+        super().__init__()
+
+        self.depth_wise_conv = nn.Conv2d(
+            dim,
+            dim,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=kernel_size // 2,
+            groups=dim
+        )
+
+    def forward(self, x: torch.Tensor, H: Optional[int] = None, W: Optional[int] = None) -> torch.Tensor:
+        r"""
+        If `H` and `W` are not given, assume `x` hasn't been flatten and its shape should be (b, c, h, w)
+        """
+        if H and W:
+            x = rearrange(x, "b (h w) c -> b c h w", h=H, w=W)
+
+        x = self.depth_wise_conv(x)
+
+        if H and W:
+            x = rearrange(x, "b c h w -> b (h w) c")
+
+        return x
+
+
+class ConvolutionalRelativePositionEncoding(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        heads: Optional[int],
+        head_dim: Optional[int],
+        kernel_size_on_heads: Dict[int, int] = { 3: 8 },
+    ) -> None:
+        super().__init__()
+
+        head_list = list(kernel_size_on_heads.values())
+        if heads is None and head_dim is None:
+            if any([True if h is None or h <= 0 else False for h in head_list]):
+                raise ValueError(
+                    "Please specify exact number (integers that are greater than 0) of heads for each kernel size when `heads` and `head_dim` are None."
+                )
+
+            self.heads = sum(head_list)
+        else:
+            self.heads = heads or dim // head_dim
+            
+            idx_auto = head_list.index(-1)
+            if idx_auto != -1:  # If "-1" in the `head_list` exist
+                head_list.pop(idx_auto)
+                if head_list.index(-1) != -1:  # If there are more than one -1
+                    raise ValueError(
+                        f"Only one kernel size's number of heads can be specified as -1. Got: {kernel_size_on_heads}"
+                    )
+                
+                # update heads
+                kernel_size_on_heads[kernel_size_on_heads.keys()[idx_auto]] = self.heads - sum(head_list)
+
+        self.head_dim = head_dim or dim // self.heads
+
+        assert (
+            dim // self.heads == self.head_dim
+        ), name_with_msg(f"`dim` ({dim}) can't be divided by `heads` ({self.heads}). Please check `heads`, `head_dim`, or `kernel_size_on_heads`.")
+
+        self.depth_wise_conv_list = nn.ModuleList([
+            nn.Conv2d(
+                self.head_dim*num_heads,
+                self.head_dim*num_heads,
+                kernel_size=kernel_size,
+                stride=1,
+                padding=kernel_size // 2,
+                groups=self.head_dim*num_heads,
+            ) for kernel_size, num_heads in kernel_size_on_heads
+        ])
+        self.split_list = list(kernel_size_on_heads.values())
+
+    def forward(self, x: torch.Tensor, H: Optional[int] = None, W: Optional[int] = None) -> torch.Tensor:
+        r"""
+        If `H` and `W` are not given, assume `x` hasn't been flatten and its shape should be (b, c, h, w), so does the outputs
+        """
+        if H and W:
+            x = rearrange(x, "b (h w) c -> b c h w", h=H, w=W)
+
+        x_list = torch.split(x, self.split_list, dim=1)
+        x_list = [conv(x) for x, conv in zip(x_list, self.depth_wise_conv_list)]
+        x = torch.cat(x_list, dim=1)
+
+        if H and W:
+            x = rearrange(x, "b c h w -> b (h w) c")
+
+        return x
+
+
+class FactorizedAttention(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        heads: Optional[int],
+        head_dim: Optional[int],
+        kernel_size_on_heads: Dict[int, int],
+        use_cls: bool = True,
+        use_bias: bool = True,
         attention_dropout: float = 0.,
         ff_dropout: float = 0.,
     ) -> None:
-        super().__init__(in_dim, proj_dim=proj_dim, out_dim=proj_dim, head_dim=head_dim, attention_dropout=attention_dropout, ff_dropout=ff_dropout)
+        super().__init__()
 
-        self.pre_height = pre_height
-        self.pre_width = pre_width
+        assert (
+            heads is not None or head_dim is not None
+        ), name_with_msg(f"Either `heads` ({heads}) or `head_dim` ({head_dim}) must be specified")
 
-        self.relative_bias = nn.Parameter(
-            torch.randn(self.heads, int((2*pre_height - 1)*(2*pre_width - 1))),
-            requires_grad=True
+        self.heads = heads if heads is not None else dim // head_dim
+        head_dim = head_dim if head_dim is not None else dim // heads
+
+        assert (
+            head_dim * self.heads == dim
+        ), name_with_msg("Head dimension ({head_dim}) times the number of heads ({self.heads}) must be equal to embedding dimension ({dim})")
+
+        self.relative_position_encoder = ConvolutionalRelativePositionEncoding(
+            dim,
+            heads,
+            head_dim,
+            kernel_size_on_heads=kernel_size_on_heads,
         )
-        self.register_buffer("relative_indices", self._get_relative_indices(pre_height, pre_width))
+        self.QKV = nn.Linear(dim, dim, bias=use_bias)
+        self.out = nn.Linear(dim, dim)
 
-    def forward(self, x: torch.tensor) -> torch.tensor:
-        b, c, H, W, h = *x.shape, self.heads
-    
+        self.attention_dropout = nn.Dropout(attention_dropout)
+        self.out_dropout= nn.Dropout(ff_dropout)
+
+        self.scale = head_dim**(-0.5)
+        self.use_cls = use_cls
+
+    def forward(self, x: torch.Tensor, H: int, W: int) -> torch.Tensor:
+        h = self.heads
+
         #
-        x = rearrange(x, "b c h w -> b (h w) c")  # b n c
-        q, k, v = map(lambda proj: proj(x), (self.Q, self.K, self.V))
-        q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (q, k, v))
+        q, k, v = self.QKV(x).chunk(chunks=3, dim=-1)
+        q = rearrange(q, "b n (h d) -> b h n d", h=h)
+        k = rearrange(k, "b n (h d) -> b h d n", h=h).softmax(dim=-1)
+        v = rearrange(v, "b n (h d) -> b h n d", h=h)
 
-        # relative biases
-        if H == self.pre_height and W == self.pre_width:
-            relative_indices = self.relative_indices
-            relative_bias = self.relative_bias
+        #
+        attention = einsum("b h p n, b h n q -> b h p q", k, v)
+        attention = self.attention_dropout(attention)
+
+        #
+        if self.use_cls:
+            b, n, _, d = v.shape
+            relative_position = self.relative_position_encoder(v[:, :, 1:, :], H, W)
+            cls_relative_position = torch.zeros(
+                (b, n, 1, d),
+                dtype=relative_position.dtype,
+                device=relative_position.device,
+                layout=relative_position.layout
+            )
+            relative_position = torch.cat([cls_relative_position, relative_position], dim=-2)
         else:
-            relative_indices = self._get_relative_indices(H, W)
-            relative_bias = self._interpolate_relative_bias(H, W)
+            relative_position = self.relative_position_encoder(v, H, W)
 
-        relative_indices = repeat(relative_indices, "n m -> b h n m", b=b, h=h)
-        relative_bias = repeat(relative_bias, "h r -> b h n r", b=b, n=H*W)  # r: number of relative biases, (2*H - 1)*(2*W - 1)
-        relative_biases = relative_bias.gather(dim=-1, index=relative_indices)
+        relative_position = einsum("b h n p, b h n q", q, v)
 
-        # similarity
-        similarity = einsum("b h n d, b h m d -> b h n m", q, k) + relative_biases  # m=n
-        similarity = similarity.softmax(dim=-1)
-        similarity = self.attention_dropout(similarity)
-        
-        # 
-        out = einsum("b h n m, b h m d -> b h n d", similarity, v)
-        out = rearrange(out, "b h n d -> b n (h d)")
-        out = self.out_dropout(self.out_linear(out))
-        out = rearrange(out, "b (h w) c -> b c h w", h=H)
+        #
+        out = einsum("b h n p, b h p q -> b h n q", q*self.scale, attention) + relative_position
+        out = rearrange("b h n d -> b n (h d)", out)
+        out = self.out_linear(out)
+        out = self.out_dropout(out)
 
         return out
 
-    def _get_relative_indices(self, height: int, width: int) -> torch.tensor:
-        height, width = int(height), int(width)
-        ticks_y, ticks_x = torch.arange(height), torch.arange(width)
-        grid_y, grid_x = torch.meshgrid(ticks_y, ticks_x)
-        out = torch.empty(height*width, height*width).fill_(float("nan"))
 
-        for idx_y in range(height):
-            for idx_x in range(width):
-                rel_indices_y = grid_y - idx_y + height
-                rel_indices_x = grid_x - idx_x + width
-                flatten_indices = (rel_indices_y*width + rel_indices_x).flatten()
-                out[idx_y*width + idx_x] = flatten_indices
-
-        assert (
-            not out.isnan().any()
-        ), name_with_msg(self, "`relative_indices` have blank indices")
-        
-        assert (
-            (out >= 0).all()
-        ), name_with_msg(self, "`relative_indices` have negative indices")
-
-        return out.to(torch.long)
-
-    def _interpolate_relative_bias(self, height: int, width: int) -> torch.Tensor:
-        out = rearrange(self.relative_bias, "h (n m) -> 1 h n m", n=(2*self.pre_height - 1))
-        out = nn.functional.interpolate(out, size=(2*height - 1, 2*width - 1), mode="bilinear", align_corners=True)
-
-        return rearrange(out, "1 h n m -> h (n m)")
-
-    def update_relative_bias_and_indices(self, height: int, width: int) -> None:
-        r"""
-        For possible input's height or width changes in inference.
-        """
-
-        self.relative_indices = self._get_relative_indices(height, width)
-        self.relative_bias = self._interpolate_relative_bias(height, width)
-        
-
-class CoAtNetTransformerBlock(nn.Module):
+class ConvAttentionalModule(nn.Module):
     def __init__(
         self,
-        input_height: int,
-        input_width: int,
-        in_dim: int,
-        out_dim: int,
-        expand_scale: int = 4,
-        use_downsampling: bool = False,
-        **kwargs
-    ):
-        super().__init__()
-        path_dropout = kwargs.pop("path_dropout")
-
-        self.norm = nn.Sequential(
-            Rearrange("b c h w -> b h w c"),
-            nn.LayerNorm(in_dim),
-            Rearrange("b h w c -> b c h w"),
-        )
-        self.attention_block = CoAtNetRelativeAttention(
-            input_height,
-            input_width,
-            in_dim,
-            out_dim,
-            **kwargs
-        )
-        self.attention_path_dropout = PathDropout(path_dropout)
-        self.pool = nn.MaxPool2d((2, 2)) if use_downsampling else nn.Identity()
-        self.skip = nn.Conv2d(in_dim, out_dim, kernel_size=1) if use_downsampling else nn.Identity()
-
-        self.ff_block = nn.Sequential(
-            nn.Conv2d(out_dim, out_dim*expand_scale, kernel_size=1),
-            nn.GELU(),
-            nn.Conv2d(out_dim*expand_scale, out_dim, kernel_size=1),
-        )
-        self.ff_path_dropout = PathDropout(path_dropout)
-
-    def forward(self, x):
-        # Equation (4) in the official paper with an extra path dropout
-        x = self.skip(self.pool(x)) + self.attention_path_dropout(self.attention_block(self.pool(self.norm(x))))
-        x = x + self.ff_path_dropout(self.ff_block(x))
-
-        return x
-
-
-class CoAtNetConvBlock(nn.Module):
-    def __init__(
-        self,
-        input_height: int,
-        input_width: int,
-        in_dim: int,
-        out_dim: int,
-        expand_scale: int = 4,
-        use_downsampling: bool = False,
-        **kwargs
-    ):
-        super().__init__()
-
-        self.norm = nn.BatchNorm2d(in_dim)
-        self.mb_conv = MBConvXd(
-            in_dim,
-            out_dim,
-            expand_scale=expand_scale,
-            stride=2 if use_downsampling else 1,
-            **kwargs
-        )
-        self.path_dropout = PathDropout(kwargs["path_dropout"] if "path_dropout" in kwargs else 0.)
-
-        self.skip = nn.Sequential(
-            nn.MaxPool2d((2, 2)),
-            nn.Conv2d(in_dim, out_dim, kernel_size=1)
-        ) if use_downsampling else nn.Identity()
-
-    def forward(self, x):
-        # Equation (5) in the offical paper with an extra path dropout
-        x = self.skip(x) + self.path_dropout(self.mb_conv(self.norm(x)))
-
-        return x
-
-
-class CoAtNetBackbone(CoAtNetBase):
-    def __init__(
-        self,
-        image_height: int,
-        image_width: int,
-        image_channel: int,
-        num_blocks_in_layers: List[int],
-        block_type_in_layers: List[int],
-        num_channels_in_layers: Union[List[int], int],
-        expand_scale_in_layers: Union[List[int], int],
-        head_dim: int = 32,
-        ff_dropout: float = 0.,
+        dim: int,
+        heads: Optional[int],
+        head_dim: Optional[int],
+        kernel_size_on_heads: Dict[int, int],
+        use_cls: bool = True,
+        use_bias: bool = True,
         attention_dropout: float = 0.,
-        path_dropout: float = 0.,
+        ff_dropout: float = 0.,
     ) -> None:
-        super().__init__(
-            image_height,
-            image_width,
-            num_blocks_in_layers,
-            num_channels_in_layers,
-            block_type_in_layers,
-            expand_scale_in_layers
+        super().__init__()
+
+        assert (
+            heads is not None or head_dim is not None
+        ), name_with_msg(f"Either `heads` ({heads}) or `head_dim` ({head_dim}) must be specified")
+
+        self.heads = heads if heads is not None else dim // head_dim
+        head_dim = head_dim if head_dim is not None else dim // heads
+
+        assert (
+            head_dim * self.heads == dim
+        ), name_with_msg("Head dimension ({head_dim}) times the number of heads ({self.heads}) must be equal to embedding dimension ({dim})")
+
+        # Add convolutional position encoding in `SerialBlock`, 
+        # which differ from `Figure 2` in the paper but aligns the official implementation:
+        # https://github.com/mlpc-ucsd/CoaT/blob/main/src/models/coat.py#L211-L214
+        # self.general_position_encoder = ConvolutionalPositionEncoding(dim)
+
+        self.relative_position_encoder = ConvolutionalRelativePositionEncoding(
+            dim,
+            heads,
+            head_dim,
+            kernel_size_on_heads=kernel_size_on_heads,
         )
+        self.QKV = nn.Linear(dim, dim, bias=use_bias)
+        self.out = nn.Linear(dim, dim)
 
-        kwargs = {}
-        kwargs["head_dim"] = head_dim
-        kwargs["ff_dropout"] = ff_dropout
-        kwargs["attention_dropout"] = attention_dropout
-        kwargs["path_dropout"] = path_dropout
+        self.attention_dropout = nn.Dropout(attention_dropout)
+        self.out_dropout= nn.Dropout(ff_dropout)
 
-        # Layers
-        self.s_0 = nn.Sequential(*[
-            nn.Conv2d(
-                image_channel,
-                self.num_channels_in_layers[0],
-                kernel_size=3,
-                stride=2,
-                padding=1
-            ) if idx == 0 else nn.Conv2d(
-                self.num_channels_in_layers[0],
-                self.num_channels_in_layers[0],
-                kernel_size=3,
-                padding=1
-            ) for idx in range(self.num_blocks_in_layers[0])
-        ])
-        self.s_1 = self._build_layer("s_1",                                                   # layer name
-            self.height_in_layers[1], self.width_in_layers[1],                                          # input size
-            self.num_channels_in_layers[0], self.num_channels_in_layers[1], self.expand_scale_in_layers[0],  # dimension-related
-            self.num_blocks_in_layers[1], self.block_type_in_layers[0],                                 # block-related
-            **kwargs
-        )
-        self.s_2 = self._build_layer("s_2",                                                   # layer name
-            self.height_in_layers[2], self.width_in_layers[2],                                          # input size
-            self.num_channels_in_layers[1], self.num_channels_in_layers[2], self.expand_scale_in_layers[1],  # dimension-related
-            self.num_blocks_in_layers[2], self.block_type_in_layers[1],                                 # block-related
-            **kwargs
-        )
-        self.s_3 = self._build_layer("s_3",                                                   # layer name
-            self.height_in_layers[3], self.width_in_layers[3],                                          # input size
-            self.num_channels_in_layers[2], self.num_channels_in_layers[3], self.expand_scale_in_layers[2],  # dimension-related
-            self.num_blocks_in_layers[3], self.block_type_in_layers[2],                                 # block-related
-            **kwargs
-        )
-        self.s_4 = self._build_layer("s_4",                                                   # layer name
-            self.height_in_layers[4], self.width_in_layers[4],                                          # input size
-            self.num_channels_in_layers[3], self.num_channels_in_layers[4], self.expand_scale_in_layers[3],  # dimension-related
-            self.num_blocks_in_layers[4], self.block_type_in_layers[3],                                 # block-related
-            **kwargs
-        )
+        self.scale = head_dim**(-0.5)
+        self.use_cls = use_cls
+        
+    def forward(self, x: torch.Tensor, H: int, W: int) -> torch.Tensor:
+        h = self.heads
 
-        self.pooler = Reduce("b c h w -> b c", "mean")  # `global_pool` in the official paper
+        #
+        q, k, v = self.QKV(x).chunk(chunks=3, dim=-1)
+        q = rearrange(q, "b n (h d) -> b h n d", h=h)
+        k = rearrange(k, "b n (h d) -> b h d n", h=h).softmax(dim=-1)
+        v = rearrange(v, "b n (h d) -> b h n d", h=h)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.s_0(x)
-        x = self.s_1(x)
-        x = self.s_2(x)
-        x = self.s_3(x)
-        x = self.s_4(x)
+        #
+        attention = einsum("b h p n, b h n q -> b h p q", k, v)
+        attention = self.attention_dropout(attention)
 
-        return self.pooler(x)  
-
-    def _build_layer(
-        self,
-        layer_name: str,
-        height: int,
-        width: int,
-        in_channel: int,
-        out_channel: int,
-        expand_scale: int,
-        num_blocks: int,
-        block_type: str,
-        **kwargs
-    ) -> nn.Module:
-        if block_type == "C":
-            core_block = CoAtNetConvBlock
-            kwargs = {"path_dropout": kwargs.pop("path_dropout")}
-        elif block_type == "T":
-            core_block = CoAtNetTransformerBlock
+        #
+        if self.use_cls:
+            b, n, _, d = v.shape
+            relative_position = self.relative_position_encoder(v[:, :, 1:, :], H, W)
+            cls_relative_position = torch.zeros(
+                (b, n, 1, d),
+                dtype=relative_position.dtype,
+                device=relative_position.device,
+                layout=relative_position.layout
+            )
+            relative_position = torch.cat([cls_relative_position, relative_position], dim=-2)
         else:
-            raise ValueError(f"Block type: '{block_type}' doesn't exist. Please choose between 'C' or 'T'")
+            relative_position = self.relative_position_encoder(v, H, W)
 
-        return nn.Sequential(OrderedDict([
-            (f"{layer_name}_{idx}", core_block(
-                input_height=height,
-                input_width=width,
-                in_dim=in_channel if idx == 0 else out_channel,
-                out_dim=out_channel,
-                expand_scale=expand_scale,
-                use_downsampling=True if idx == 0 else False,
-                **kwargs
-            )) for idx in range(num_blocks)
-        ]))
+        relative_position = einsum("b h n p, b h n q", q, v)
+
+        #
+        out = einsum("b h n p, b h p q -> b h n q", q*self.scale, attention) + relative_position
+        out = rearrange("b h n d -> b n (h d)", out)
+        out = self.out_linear(out)
+        out = self.out_dropout(out)
+
+        return out
 
 
-class CoAtNetWithLinearClassifier(CoAtNetBackbone):
-    def __init__(self, config: CoAtNetConfig = None):
-        num_classes = config_pop_argument(config, "num_classes")
-        pred_act_fnc_name = config_pop_argument(config, "pred_act_fnc_name")
-        super().__init__(**config.__dict__)
+class SerialBlock(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        ff_expand_scale: int = 4,
+        path_dropout: float = 0.,
+        use_cls: bool = True,
+        **kwargs,
+    ) -> None:
+        super().__init__()
 
-        self.proj_head = ProjectionHead(
-            config.num_channels_in_layers[-1],
-            num_classes,
-            pred_act_fnc_name,
+        self.conv_position_encoder = ConvolutionalPositionEncoding(dim)
+
+        self.norm_0 = nn.LayerNorm(dim)
+        self.conv_attn_module = ConvAttentionalModule(
+            dim,
+            use_cls=use_cls,
+            **kwargs,
         )
+        self.path_dropout_0 = PathDropout(path_dropout)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = super().forward(x)
+        self.norm_1 = nn.LayerNorm(dim)
+        self.ff_block = FeedForward(
+            dim,
+            ff_expand_scale=ff_expand_scale,
+            ff_dropout=kwargs["ff_dropout"],
+        )
+        self.path_dropout_1 = PathDropout(path_dropout)
 
-        return self.proj_head(x)
+        self.use_cls = use_cls
+
+    def forward(self, x: torch.Tensor, H: int, W: int) -> torch.Tensor:
+        # Add convolutional position encoding before the ``ConvAttentionalModule`, 
+        # which differ from `Figure 2` in the paper but aligns the official implementation:
+        # https://github.com/mlpc-ucsd/CoaT/blob/main/src/models/coat.py#L211-L214
+
+        if self.use_cls:
+            cls_token, x = x[:, :1, :], x[:, 1:, :]
+
+        x = self.conv_position_encoder(x, H, W)
+
+        if self.use_cls:
+            x = torch.cat([cls_token, x], dim=1)
+
+        x = x + self.path_dropout_0(self.conv_attn_module(self.norm_0(x)))
+
+        x = x + self.path_dropout_1(self.ff_block(self.norm_1(x)))
+
+        return x
+
+
+class ParallelBlock(nn.Module):
+    def __init__(self):
+        super().__init__()
