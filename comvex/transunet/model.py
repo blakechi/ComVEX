@@ -3,13 +3,14 @@ from einops.layers.torch import Rearrange
 
 from comvex.transunet.utils import TransUNetEncoderConvBlock, TransUNetViT
 from comvex.utils import UNetBase, UNetDecoder
+from comvex.utils.helpers import name_with_msg
 
 
 class TransUNetEncoder(nn.Module):
     def __init__(self, input_channel, channel_in_between, num_res_blocks_in_between, vit_input_size, **kwargs):
         super().__init__()
         
-        assert len(channel_in_between) >= 1, f"[{self.__class__.__name__}] Please specify the number of channels for at least 1 layer."
+        assert len(channel_in_between) >= 1, name_with_msg(self, "Please specify the number of channels for at least 1 layer.")
 
         channel_in_between = [input_channel] + channel_in_between
         self.layers = nn.ModuleList([

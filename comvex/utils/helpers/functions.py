@@ -1,6 +1,8 @@
 from typing import Optional, Any
+from functools import partial
 import warnings
 
+import torch
 from torch import nn
 
 from comvex.utils.config_base import ConfigBase
@@ -31,3 +33,13 @@ def get_attr_if_exists(module: nn.Module, attr: str) -> Optional[nn.Module]:
     return None
 
 
+def get_act_fnc(act_fnc_name: str) -> Optional[nn.Module]:
+    return get_attr_if_exists(nn.modules.activation, act_fnc_name)
+
+
+def get_norm_layer(norm_name: str) -> Optional[nn.Module]:
+    return get_attr_if_exists(nn.modules.batchnorm, norm_name) or get_attr_if_exists(nn.modules.normalization, norm_name)
+
+
+def get_conv_layer(conv_name: str) -> Optional[nn.Module]:
+    return get_attr_if_exists(nn.modules.conv, conv_name)

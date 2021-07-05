@@ -29,7 +29,7 @@ This is an PyTorch implementation of [EfficientNetV2: Smaller Models and Faster 
 1. EfficientNetV2 Configuration
 
 ```python
-from comvex.efficientnet_v2 import EfficientNetV2Config
+from comvex.efficientnet_v2 import EfficientNetV2Config, EfficientNetV2BaseConfig
 
 efficientnet_v2_config = EfficientNetV2Config(
     base_config=EfficientNetV2BaseConfig.EfficientNetV2_S(),  # The configuration for the model architecture.
@@ -54,7 +54,7 @@ efficientnet_v2_config = EfficientNetV2Config(
 2. EfficientNetV2 Backbone
 
 ```python
-from comvex.efficientnet_v2 import EfficientNetV2Backbone
+from comvex.efficientnet_v2 import EfficientNetV2Backbone, EfficientNetV2BaseConfig
 
 efficientnet_v2_backbone = EfficientNetV2Backbone(
     base_config=EfficientNetV2BaseConfig.EfficientNetV2_S(),  # The configuration for the model architecture.

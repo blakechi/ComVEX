@@ -7,8 +7,8 @@ import torch
 
 from comvex.cait import CaiTConfig, CaiTWithLinearClassifier
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
 
     cait_config = CaiTConfig.CaiT_XXS_24(num_classes=1000, ff_dropout=0.1)
     cait = CaiTWithLinearClassifier(cait_config)

@@ -59,7 +59,7 @@ class ClassAttentionLayer(nn.Module):
             dim=dim,
             alpha=alpha,
             core_block=MLP,
-            hidden_dim=dim*ff_expand_scale,
+            expand_dim=dim*ff_expand_scale,
             ff_dropout=ff_dropout,
             path_dropout=path_dropout,
         )
@@ -99,7 +99,7 @@ class SelfAttentionLayer(nn.Module):
             core_block=MLP,
             dim=dim,
             alpha=alpha,
-            hidden_dim=dim*ff_expand_scale,
+            expand_dim=dim*ff_expand_scale,
             ff_dropout=ff_dropout,
             path_dropout=path_dropout,
         )

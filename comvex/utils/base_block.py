@@ -1,7 +1,17 @@
+from functools import partial
+from typing import Optional, Literal, List
+
 import torch
 from torch import nn
+from torch import nn
+try:
+    from typing_extensions import Final
+except:
+    from torch.jit import Final
 
+from comvex.utils.helpers.functions import get_act_fnc, get_conv_layer, get_norm_layer, name_with_msg
 from .dropout import PathDropout
+from .convolution import XXXConvXdBase
 
 
 class Residual(nn.Module):
@@ -18,6 +28,7 @@ class Residual(nn.Module):
             return x[0] + self.path_dropout(self._fn(x, *args, **kwargs))  # assume the first element is the main hidden state
         else:
             return x + self.path_dropout(self._fn(x, *args, **kwargs))
+
 
 # TODO: Refine it!!
 class LayerNorm(nn.Module):
@@ -69,40 +80,50 @@ class MaskLayerNorm(LayerNorm):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, *, dim=None, hidden_dim=None, output_dim=None, ff_dim_scale=None, ff_dropout=0.0, act_fnc_name="GELU", useNorm=False, **kwargs):
+    r"""
+    Feed-Forward Layer (Alias: MLP)
+
+    Support 1x1 convolution for 1, 2, and 3D data
+    """
+    def __init__(
+        self,
+        dim: int,
+        out_dim: Optional[int] = None,
+        expand_dim: Optional[int] = None,
+        ff_expand_scale: Optional[int] = None,
+        ff_dropout: float = 0.0,
+        act_fnc_name: str = "GELU",
+        use_convXd: Optional[int] = None,
+        **rest
+    ) -> None:
         super().__init__()
-        assert dim is not None, f"[{self.__class__.__name__}] Must specify the input dim"
-        if hidden_dim is None:
-            assert ff_dim_scale is not None, f"[{self.__class__.__name__}] Must specify `ff_dim_scale` when `hidden_dim` doesn't exist"
+        
+        expand_dim = expand_dim or ff_expand_scale*dim if (expand_dim is not None) and (ff_expand_scale is not None) else dim
+        out_dim = out_dim or dim
 
-        hidden_dim = hidden_dim if hidden_dim is not None else ff_dim_scale*dim
-        out_dim = output_dim if output_dim is not None else dim
+        if use_convXd:
+            assert (
+                0 < use_convXd and use_convXd < 4
+            ), name_with_msg(f"`use_convXd` must be 1, 2, or 3 for valid `ConvXd` supported by PyTorch. But got: {use_convXd}")
 
-        if useNorm:
-            self._net = nn.Sequential(
-                LayerNorm(
-                    nn.Sequential(
-                        nn.Linear(dim, hidden_dim),
-                        nn.Dropout(ff_dropout),
-                    ),
-                    dim=dim
-                ),
-                getattr(nn, act_fnc_name)(),
-                LayerNorm(
-                    nn.Linear(hidden_dim, out_dim),
-                    dim=hidden_dim
-                ),
-            )
+            core = partial(get_conv_layer(f"Conv{use_convXd}d"), kernel_size=1)
         else:
-            self._net = nn.Sequential(
-                nn.Linear(dim, hidden_dim),
-                getattr(nn, act_fnc_name)(),
-                nn.Dropout(ff_dropout),
-                nn.Linear(hidden_dim, out_dim),
-            )
+            core = nn.Linear
 
-    def forward(self, x):
-        return self._net(x)
+        self.ff_0 = core(dim, expand_dim)
+        self.act_fnc = get_act_fnc(act_fnc_name)()
+        self.dropout = nn.Dropout(ff_dropout)
+        self.ff_1 = core(expand_dim, out_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.ff_0(x)
+        x = self.act_fnc(x)
+        x = self.dropout(x)
+        x = self.ff_1(x)
+
+        return x
+
+MLP = FeedForward
 
 
 # Reference from: https://github.com/huggingface/transformers/blob/master/src/transformers/models/bert/modeling_bert.py#L642
@@ -112,7 +133,7 @@ class ProjectionHead(nn.Module):
 
         self.head = nn.Sequential(  
             nn.Linear(dim, dim),
-            getattr(nn, act_fnc_name)(),
+            get_act_fnc(act_fnc_name)(),
             nn.LayerNorm(dim),
             nn.Linear(dim, out_dim),
         )
@@ -121,17 +142,43 @@ class ProjectionHead(nn.Module):
         return self.head(x)
 
 
-class MLP(nn.Module):
-    def __init__(self, dim, hidden_dim, act_fnc_name="GELU", ff_dropout=0.):
-        super().__init__()
+class PatchEmbeddingXd(XXXConvXdBase):
+    to_flat: Final[bool]
+    dimension: Final[int]
 
-        self._net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.Dropout(ff_dropout),
-            getattr(nn, act_fnc_name)(),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(ff_dropout)
+    def __init__(
+        self,
+        image_channel: int,
+        embedding_dim: int,
+        patch_size: int,
+        dimension: int = 2,
+        to_flat: bool = True,
+    ) -> None:
+        super().__init__(in_channel=image_channel, out_channel=embedding_dim, dimension=dimension)
+
+        self.proj = self.conv(
+            self.in_channel,
+            self.out_channel,
+            kernel_size=patch_size,
+            stride=patch_size
         )
+        self.norm = nn.LayerNorm(self.out_channel) if to_flat else get_norm_layer(f"BatchNorm{self.dimension}d")(self.out_channel)
 
+        self.to_flat = to_flat
+        
     def forward(self, x):
-        return self._net(x)
+        x = self.proj(x)
+        _, _, H, W = x.shape
+
+        if self.to_flat:
+            if self.dimension > 1:
+                x = x.flatten(-2)
+            x = torch.einsum("b d n -> b n d", x)
+
+        x = self.norm(x)
+
+        return x, (H, W)
+
+    @torch.jit.ignore
+    def no_weight_decay(self) -> List[str]:
+        return ["LayerNorm.weight"] if self.to_flat else [f"BatchNorm{self.dimension}d.weight"]

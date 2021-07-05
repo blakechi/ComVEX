@@ -34,7 +34,7 @@ class ResMLPLayer(nn.Module):
             pre_norm=AffineTransform, 
             alpha=alpha, 
             path_dropout=path_dropout,
-            hidden_dim=4*dim,
+            expand_scale=4,
             ff_dropout=ff_dropout
         )
 
