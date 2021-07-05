@@ -1,11 +1,17 @@
 from functools import partial
-from typing import Optional
+from typing import Optional, Literal, List
 
 import torch
 from torch import nn
+from torch import nn
+try:
+    from typing_extensions import Final
+except:
+    from torch.jit import Final
 
-from comvex.utils.helpers.functions import get_act_fnc, get_conv_layer, name_with_msg
+from comvex.utils.helpers.functions import get_act_fnc, get_conv_layer, get_norm_layer, name_with_msg
 from .dropout import PathDropout
+from .convolution import XXXConvXdBase
 
 
 class Residual(nn.Module):
@@ -134,3 +140,45 @@ class ProjectionHead(nn.Module):
 
     def forward(self, x):
         return self.head(x)
+
+
+class PatchEmbeddingXd(XXXConvXdBase):
+    to_flat: Final[bool]
+    dimension: Final[int]
+
+    def __init__(
+        self,
+        image_channel: int,
+        embedding_dim: int,
+        patch_size: int,
+        dimension: int = 2,
+        to_flat: bool = True,
+    ) -> None:
+        super().__init__(in_channel=image_channel, out_channel=embedding_dim, dimension=dimension)
+
+        self.proj = self.conv(
+            self.in_channel,
+            self.out_channel,
+            kernel_size=patch_size,
+            stride=patch_size
+        )
+        self.norm = nn.LayerNorm(self.out_channel) if to_flat else get_norm_layer(f"BatchNorm{self.dimension}d")(self.out_channel)
+
+        self.to_flat = to_flat
+        
+    def forward(self, x):
+        x = self.proj(x)
+        _, _, H, W = x.shape
+
+        if self.to_flat:
+            if self.dimension > 1:
+                x = x.flatten(-2)
+            x = torch.einsum("b d n -> b n d", x)
+
+        x = self.norm(x)
+
+        return x, (H, W)
+
+    @torch.jit.ignore
+    def no_weight_decay(self) -> List[str]:
+        return ["LayerNorm.weight"] if self.to_flat else [f"BatchNorm{self.dimension}d.weight"]

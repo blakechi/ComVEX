@@ -5,7 +5,7 @@ from einops import rearrange
 from einops.layers.torch import Rearrange, Reduce
 
 from comvex.utils import LayerNorm, FeedForward, ProjectionHead, TokenDropout, PathDropout
-from comvex.utils.helpers.functions import config_pop_argument
+from comvex.utils.helpers.functions import config_pop_argument, name_with_msg
 from .config import SwinTransformerConfig
 
 
@@ -28,7 +28,7 @@ class SwinTransformerBase(nn.Module):
 
         assert (
             (self.num_patches**0.5) * patch_size == image_size
-        ), f"[{self.__class__.__name__}] Image size must be divided by the patch size."
+        ), name_with_msg(self, "Image size must be divided by the patch size.")
 
         self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
 

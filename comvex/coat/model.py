@@ -1,19 +1,44 @@
-from comvex.utils.base_block import FeedForward
+import enum
+from os import name
 from typing import List, Dict, Optional, Tuple
-from collections import OrderedDict, namedtuple
 
 import torch
-from torch import nn, einsum, use_deterministic_algorithms
+from torch import nn, einsum
 from einops import rearrange, repeat
-from einops.layers.torch import Rearrange, Reduce
 
-from comvex.utils import PathDropout, ProjectionHead
+from comvex.vit import ViTBase
+from comvex.utils import FeedForward, PathDropout, ProjectionHead, PatchEmbeddingXd
 from comvex.utils.helpers import name_with_msg, config_pop_argument
-from .config import CoaTConfig
+from .config import CoaTLiteConfig
 
 
-CoaTReturnType = namedtuple("CoaTRetureType", "x cls_token")
+class CoaTBase(ViTBase):
+    def __init__(
+        self,
+        image_size: int,
+        image_channel: int,
+        patch_size: int,
+        num_layers_in_stages: List[int],
+        num_channels: List[int],
+        expand_scales: List[int],
+        kernel_size_on_heads: Dict[int, int],
+        heads: Optional[int] = None,
+    ) -> None:
+        super().__init__(image_size, image_channel, patch_size, use_patch_and_flat=False)
 
+        self.image_channel = image_channel
+        self.num_stages = len(num_layers_in_stages)
+        self.num_layers_in_stages = num_layers_in_stages
+        self.num_channels = num_channels
+        self.expand_scales = expand_scales
+        self.patch_sizes = [self.patch_size, *((2, )*(self.num_stages - 1))]
+
+        if heads is not None:
+            assert (
+                heads == sum(kernel_size_on_heads.values())
+            ), name_with_msg(f"Number of heads should be equal for `heads` ({heads}) and the sum of values of `kernel_size_on_heads` ({sum(kernel_size_on_heads.values())})")
+        self.heads = heads or sum(kernel_size_on_heads.values())
+        self.kernel_size_on_heads = kernel_size_on_heads
 
 class ConvolutionalPositionEncoding(nn.Module):
     def __init__(
@@ -62,7 +87,7 @@ class ConvolutionalRelativePositionEncoding(nn.Module):
         dim: int,
         heads: Optional[int],
         head_dim: Optional[int],
-        kernel_size_on_heads: Dict[int, int] = { 3: 8 },
+        kernel_size_on_heads: Dict[int, int] = { 3: 2, 5: 3, 7: 3 },  # From: https://github.com/mlpc-ucsd/CoaT/blob/main/src/models/coat.py#L358
         use_cls: bool = True,
     ) -> None:
         super().__init__()
@@ -77,17 +102,6 @@ class ConvolutionalRelativePositionEncoding(nn.Module):
             self.heads = sum(head_list)
         else:
             self.heads = heads or dim // head_dim
-            
-            idx_auto = head_list.index(-1)
-            if idx_auto != -1:  # If "-1" in the `head_list` exist
-                head_list.pop(idx_auto)
-                if head_list.index(-1) != -1:  # If there are more than one -1
-                    raise ValueError(
-                        f"Only one kernel size's number of heads can be specified as -1. Got: {kernel_size_on_heads}"
-                    )
-                
-                # update heads
-                kernel_size_on_heads[kernel_size_on_heads.keys()[idx_auto]] = self.heads - sum(head_list)
 
         self.head_dim = head_dim or dim // self.heads
 
@@ -103,52 +117,52 @@ class ConvolutionalRelativePositionEncoding(nn.Module):
                 stride=1,
                 padding=kernel_size // 2,
                 groups=self.head_dim*num_heads,
-            ) for kernel_size, num_heads in kernel_size_on_heads
+            ) for kernel_size, num_heads in kernel_size_on_heads.items()
         ])
-        self.split_list = list(kernel_size_on_heads.values())
+        self.split_list = [num_heads*self.head_dim for num_heads in kernel_size_on_heads.values()]
 
         self.use_cls = use_cls
 
-    def forward(self, x: torch.Tensor, H: Optional[int] = None, W: Optional[int] = None) -> torch.Tensor:
+    def forward(self, q: torch.Tensor, v: torch.Tensor, H: Optional[int] = None, W: Optional[int] = None) -> torch.Tensor:
         r"""
         If `H` and `W` are not given, assume `x` hasn't been flatten and its shape should be (b, c, h, w), so does the outputs
         """
 
         if H and W:
-            b, n, p, d = x.shape  # p for heads
+            b, p, n, d = v.shape  # p for heads
 
         if self.use_cls:
-            x = x[:, 1:, :, :]
+            v = v[:, :, 1:, :]
 
         if H and W:
-            x = rearrange(x, "b (h w) p d -> b (p d) h w", h=H, w=W)
+            v = rearrange(v, "b p (h w) d -> b (p d) h w", h=H, w=W)
 
-        x_list = torch.split(x, self.split_list, dim=1)
-        x_list = [conv(x) for x, conv in zip(x_list, self.depth_wise_conv_list)]
-        x = torch.cat(x_list, dim=1)
+        v_list = torch.split(v, self.split_list, dim=1)
+        v_list = [conv(v) for v, conv in zip(v_list, self.depth_wise_conv_list)]
+        v = torch.cat(v_list, dim=1)
 
         if H and W:
-            x = rearrange(x, "b (p d) h w -> b (h w) p d", p=p, d=d)
-            
+            v = rearrange(v, "b (p d) h w -> b p (h w) d", p=p, d=d)
+
         if self.use_cls:
             cls_relative_position = torch.zeros(
-                (b, n, 1, d),
-                dtype=x.dtype,
-                device=x.device,
-                layout=x.layout
+                (b, p, 1, d),
+                dtype=v.dtype,
+                device=v.device,
+                layout=v.layout
             )
-            x = torch.cat([cls_relative_position, x], dim=1)
+            v = torch.cat([cls_relative_position, v], dim=-2)
 
-        return x
+        return q*v
 
 
 class FactorizedAttention(nn.Module):
     def __init__(
         self,
         dim: int,
-        heads: Optional[int],
-        head_dim: Optional[int],
         kernel_size_on_heads: Dict[int, int],
+        heads: Optional[int] = None,
+        head_dim: Optional[int] = None,
         use_cls: bool = True,
         use_bias: bool = True,
         conv_relative_postion_encoder: Optional[nn.Module] = None,
@@ -159,14 +173,14 @@ class FactorizedAttention(nn.Module):
 
         assert (
             heads is not None or head_dim is not None
-        ), name_with_msg(f"Either `heads` ({heads}) or `head_dim` ({head_dim}) must be specified")
+        ), name_with_msg(self, f"Either `heads` ({heads}) or `head_dim` ({head_dim}) must be specified")
 
         self.heads = heads if heads is not None else dim // head_dim
         head_dim = head_dim if head_dim is not None else dim // heads
 
         assert (
             head_dim * self.heads == dim
-        ), name_with_msg(f"Head dimension ({head_dim}) times the number of heads ({self.heads}) must be equal to embedding dimension ({dim})")
+        ), name_with_msg(self, f"Head dimension ({head_dim}) times the number of heads ({self.heads}) must be equal to embedding dimension ({dim})")
 
         self.relative_position_encoder = ConvolutionalRelativePositionEncoding(
             dim,
@@ -176,8 +190,8 @@ class FactorizedAttention(nn.Module):
             use_cls=use_cls
         ) if conv_relative_postion_encoder is None else conv_relative_postion_encoder
 
-        self.QKV = nn.Linear(dim, dim, bias=use_bias)
-        self.out = nn.Linear(dim, dim)
+        self.QKV = nn.Linear(dim, 3*dim, bias=use_bias)
+        self.out_linear = nn.Linear(dim, dim)
 
         self.attention_dropout = nn.Dropout(attention_dropout)
         self.out_dropout= nn.Dropout(ff_dropout)
@@ -199,12 +213,11 @@ class FactorizedAttention(nn.Module):
         attention = self.attention_dropout(attention)
 
         #
-        relative_position = self.relative_position_encoder(v, H, W)
-        relative_position = einsum("b h n p, b h n q", q, v)
+        relative_position = self.relative_position_encoder(q, v, H, W)
 
         #
         out = einsum("b h n p, b h p q -> b h n q", q*self.scale, attention) + relative_position
-        out = rearrange("b h n d -> b n (h d)", out)
+        out = rearrange(out, "b h n d -> b n (h d)")
         out = self.out_linear(out)
         out = self.out_dropout(out)
 
@@ -287,7 +300,7 @@ class CoaTSerialBlock(nn.Module):
         # https://github.com/mlpc-ucsd/CoaT/blob/main/src/models/coat.py#L211-L214
         x = self.conv_position_encoder(x, H, W)
 
-        x = x + self.path_dropout_0(self.conv_attn_module(self.norm_0(x)))
+        x = x + self.path_dropout_0(self.conv_attn_module(self.norm_0(x), H, W))
         x = x + self.path_dropout_1(self.ff_block(self.norm_1(x)))
 
         return x
@@ -368,7 +381,109 @@ class CoaTParallelBlock(nn.Module):
 
         return args
 
+    def interpolate(self, x: torch.Tensor, size: Tuple[int, int]) -> torch.Tensor:
+        return nn.functional.interpolate(x, size=size, mode="bilinear")
 
-class CoaTBackbone(nn.Module):
-    def __init__(self):
-        super().__init__()
+
+class CoaTLiteBackbone(CoaTBase):
+    def __init__(
+        self,
+        image_channel: int, 
+        image_size: int, 
+        patch_size: int,
+        num_layers_in_stages: List[int],
+        num_channels: List[int],
+        expand_scales: List[int],
+        heads: Optional[int] = None,
+        kernel_size_on_heads: Dict[int, int] = { 3: 2, 5: 3, 7: 3 },  # From: https://github.com/mlpc-ucsd/CoaT/blob/main/src/models/coat.py#L358
+        use_bias: bool = True,
+        attention_dropout: float = 0.,
+        ff_dropout: float = 0.,
+        path_dropout: float = 0.,
+    ) -> None:
+        super().__init__(
+            image_channel=image_channel,
+            image_size=image_size,
+            patch_size=patch_size,
+            num_layers_in_stages=num_layers_in_stages,
+            num_channels=num_channels,
+            expand_scales=expand_scales,
+            heads=heads,
+            kernel_size_on_heads=kernel_size_on_heads,
+        )
+        
+        kwargs = {}
+        kwargs["use_bias"] = use_bias
+        kwargs["attention_dropout"] = attention_dropout
+        kwargs["ff_dropout"] = ff_dropout
+        kwargs["path_dropout"] = path_dropout
+
+        self.stages = nn.ModuleList([
+            self._build_stage(idx, **kwargs) for idx in range(len(num_layers_in_stages))
+        ])
+        for stage_idx, channels in enumerate(self.num_channels):
+            self.register_parameter(f"cls_token_{stage_idx}", nn.Parameter(torch.randn(1, 1, channels), requires_grad=True))
+
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        b = x.shape[0]
+        feature_maps = {}
+
+        for idx in range(self.num_stages):
+            cls_token = self.get_parameter(f"cls_token_{idx}")
+            patch_embedding, serial_blocks = self.stages[idx]
+
+            cls_token = repeat(cls_token, "1 1 d -> b 1 d", b=b)
+            x, (H, W) = patch_embedding(x)
+            x = torch.cat([cls_token, x], dim=1)
+
+            for block in serial_blocks:
+                x = block(x, H, W)
+
+            cls_token, x = x[:, :1, :], x[:, 1:, :]
+            x = rearrange(x, "b (h w) c -> b c h w", h=H, w=W)
+            feature_maps[f"cls_token_{idx}"] = cls_token
+            feature_maps[f"feature_map_{idx}"] = x
+
+        return feature_maps
+
+    @torch.jit.ignore
+    def _build_stage(self, stage_idx: int, **kwargs):
+        return nn.ModuleList([
+            PatchEmbeddingXd(
+                image_channel=self.num_channels[stage_idx - 1] if stage_idx > 0 else self.image_channel,
+                embedding_dim=self.num_channels[stage_idx],
+                patch_size=self.patch_sizes[stage_idx],
+            ),
+            nn.ModuleList([
+                CoaTSerialBlock(
+                    dim=self.num_channels[stage_idx],
+                    heads=self.heads,
+                    kernel_size_on_heads=self.kernel_size_on_heads,
+                    ff_expand_scale=self.expand_scales[stage_idx],
+                    **kwargs,
+                ) for _ in range(self.num_layers_in_stages[stage_idx])
+            ])
+        ])
+
+    @torch.jit.ignore
+    def no_weight_decay(self) -> List[str]:
+        return [f"cls_token_{idx}" for idx in range(self.num_stages)] + ["bias", "LayerNorm.weight"]
+
+
+class CoaTLiteWithLinearClassifier(CoaTLiteBackbone):
+    def __init__(self, config: Optional[CoaTLiteConfig] = None) -> None:
+        num_classes = config_pop_argument(config, "num_classes")
+        pred_act_fnc_name = config_pop_argument(config, "pred_act_fnc_name")
+        super().__init__(**config.__dict__)
+
+        self.proj_head = ProjectionHead(
+            self.num_channels[-1],
+            num_classes,
+            pred_act_fnc_name,
+        )
+
+    def forward(self, x):
+        feature_maps = super().forward(x)
+        cls_token = feature_maps[f"cls_token_{self.num_stages - 1}"]
+
+        return self.proj_head(cls_token)

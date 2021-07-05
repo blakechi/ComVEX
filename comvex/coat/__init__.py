@@ -1,2 +1,2 @@
-from .model import CoAtNetBase, CoAtNetRelativeAttention, CoAtNetTransformerBlock, CoAtNetConvBlock, CoAtNetBackbone, CoAtNetWithLinearClassifier
-from .config import CoAtNetConfig
+from .model import CoaTBase, FactorizedAttention, ConvAttentionalModule, CoaTSerialBlock, CoaTParallelBlock, CoaTLiteBackbone, CoaTLiteWithLinearClassifier
+from .config import CoaTLiteConfig

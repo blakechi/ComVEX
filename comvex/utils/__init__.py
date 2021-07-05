@@ -1,4 +1,4 @@
-from .base_block import Residual, LayerNorm, MaskLayerNorm, FeedForward, ProjectionHead, MLP
+from .base_block import Residual, LayerNorm, MaskLayerNorm, FeedForward, ProjectionHead, MLP, PatchEmbeddingXd
 from .config_base import ConfigBase
 from .convolution import XXXConvXdBase
 from .dropout import TokenWiseDropout, TokenDropout, PathDropout
@@ -14,7 +14,7 @@ from .unet import UNetBase, UNetConvBlock, UNetEncoder, UNetDecoder, UNet
 
 # Allow to Import All Modules using `*` and Exclude Functions. Please Import Functions One by One.
 __all__ = [
-    "Residual", "LayerNorm", "MaskLayerNorm", "FeedForward", "ProjectionHead", "MLP",
+    "Residual", "LayerNorm", "MaskLayerNorm", "FeedForward", "ProjectionHead", "MLP", "PatchEmbeddingXd",
     "ConfigBase",
     "XXXConvXdBase",
     "TokenWiseDropout", "TokenDropout", "PathDropout",

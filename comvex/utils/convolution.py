@@ -17,6 +17,7 @@ class XXXConvXdBase(nn.Module):
 
     in_channel: Final[int]
     out_channel: Final[int]
+    dimension: Final[int]
 
     def __init__(
         self,
@@ -32,10 +33,12 @@ class XXXConvXdBase(nn.Module):
         assert (
             (0 < dimension) and (dimension < 4)
         ), name_with_msg(self, "`dimension` must be larger than 0 and smaller than 4")
+        
+        self.dimension = dimension
 
-        if dimension == 1:
+        if self.dimension == 1:
             self.conv = nn.Conv1d
-        elif dimension == 2:
+        elif self.dimension == 2:
             self.conv = nn.Conv2d
         else: 
             self.conv = nn.Conv3d
