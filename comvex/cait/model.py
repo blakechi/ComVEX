@@ -50,6 +50,7 @@ class ClassAttentionLayer(nn.Module):
             dim=dim,
             alpha=alpha,
             core_block=ClassAttention,
+            ff_dropout=ff_dropout,
             path_dropout=path_dropout,
             **kwargs
         )
@@ -89,6 +90,7 @@ class SelfAttentionLayer(nn.Module):
             core_block=TalkingHeadAttention,
             dim=dim,
             alpha=alpha,
+            ff_dropout=ff_dropout,
             path_dropout=path_dropout,
             **kwargs
         )
