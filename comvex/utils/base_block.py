@@ -128,12 +128,13 @@ MLP = FeedForward
 
 # Reference from: https://github.com/huggingface/transformers/blob/master/src/transformers/models/bert/modeling_bert.py#L642
 class ProjectionHead(nn.Module):
-    def __init__(self, dim, out_dim, act_fnc_name="ReLU"):
+    def __init__(self, dim: int, out_dim: int, act_fnc_name: str = "ReLU", ff_dropout: float = 0.1):
         super().__init__()
 
         self.head = nn.Sequential(  
             nn.Linear(dim, dim),
             get_act_fnc(act_fnc_name)(),
+            nn.Dropout(ff_dropout),
             nn.LayerNorm(dim),
             nn.Linear(dim, out_dim),
         )

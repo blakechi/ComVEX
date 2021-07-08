@@ -485,5 +485,6 @@ class CoaTLiteWithLinearClassifier(CoaTLiteBackbone):
     def forward(self, x):
         feature_maps = super().forward(x)
         cls_token = feature_maps[f"cls_token_{self.num_stages - 1}"]
-
+        cls_token = rearrange(cls_token, "b 1 d -> b d")
+        
         return self.proj_head(cls_token)
