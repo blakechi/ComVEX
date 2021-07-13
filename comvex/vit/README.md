@@ -1,6 +1,6 @@
 # Vision Transformer (ViT)
 
-This is an PyTorch implementation of [AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE](https://arxiv.org/abs/2010.11929) referenced from [lucidrains](https://github.com/blakechi/vit-pytorch). For the official implementation, check out this [repo](https://github.com/google-research/vision_transformer).
+This is an PyTorch implementation of [AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE](https://arxiv.org/abs/2010.11929) referenced from [lucidrains](https://github.com/blakechi/vit-pytorch). For the official implementation, check out this [repo](https://github.com/google-research/vision_transformer). Added new model configurations from [Scaling Vision Transformers](https://arxiv.org/abs/2106.04560).
 
 ## Objects
 
@@ -79,6 +79,17 @@ python examples/ViT/demo.py
       author={Alexey Dosovitskiy and Lucas Beyer and Alexander Kolesnikov and Dirk Weissenborn and Xiaohua Zhai and Thomas Unterthiner and Mostafa Dehghani and Matthias Minderer and Georg Heigold and Sylvain Gelly and Jakob Uszkoreit and Neil Houlsby},
       year={2020},
       eprint={2010.11929},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+
+```bibtex
+@misc{zhai2021scaling,
+      title={Scaling Vision Transformers},
+      author={Xiaohua Zhai and Alexander Kolesnikov and Neil Houlsby and Lucas Beyer},
+      year={2021},
+      eprint={2106.04560},
       archivePrefix={arXiv},
       primaryClass={cs.CV}
 }
