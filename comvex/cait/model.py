@@ -1,4 +1,5 @@
-from typing import Optional, Tuple
+from typing import Optional
+from functools import partial
 from collections import OrderedDict
 
 import torch
@@ -6,32 +7,12 @@ from torch import nn
 from einops import repeat
 
 from comvex.vit import ViTBase
-from comvex.utils import LayerScale, MultiheadAttention, TalkingHeadAttention, MLP, TokenDropout, ProjectionHead
+from comvex.utils import LayerScale, ClassMultiheadAttention, TalkingHeadAttention, MLP, TokenDropout, ProjectionHead
 from comvex.utils.helpers.functions import config_pop_argument
 from .config import CaiTConfig
 
 
-class ClassAttention(nn.Module):
-    def __init__(
-        self,
-        dim: int,
-        heads: int,
-        attention_dropout: float = 0.,
-        ff_dropout: float = 0.,
-    ) -> None:
-        super().__init__()
-
-        self.attn = MultiheadAttention(
-            dim,
-            heads=heads,
-            attention_dropout=attention_dropout,
-            ff_dropout=ff_dropout
-        )
-
-    def forward(self, cls_token, x) -> torch.Tensor:
-        z = torch.cat([cls_token, x], dim=1)
-
-        return self.attn((cls_token, z, z))
+ClassAttention = ClassMultiheadAttention
         
 
 class ClassAttentionLayer(nn.Module):
@@ -52,6 +33,7 @@ class ClassAttentionLayer(nn.Module):
             core_block=ClassAttention,
             ff_dropout=ff_dropout,
             path_dropout=path_dropout,
+            cat_cls_to_context_at_dim=1,
             **kwargs
         )
 

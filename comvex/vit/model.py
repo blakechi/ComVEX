@@ -1,10 +1,12 @@
+from typing import Optional
+from einops.einops import rearrange
 import torch
 from torch import nn
 from einops import repeat
 from einops.layers.torch import Rearrange
 
 from comvex.transformer import Transformer
-from comvex.utils import ProjectionHead, TokenDropout
+from comvex.utils import ProjectionHead, TokenDropout, ClassMultiheadAttention
 from comvex.utils.helpers import name_with_msg, config_pop_argument
 from .config import ViTConfig
 
@@ -37,9 +39,12 @@ class ViTBackbone(ViTBase):
         dim,  # tokens' dimension
         num_heads,
         depth,
+        use_multihead_attention_pooling: bool = True,
+        cat_cls_to_context: bool = False,
         pre_norm=False,
         ff_dim=None,  # If not specify, ff_dim = 4*dim
         ff_dropout=0.0,
+        attention_dropout=0.0,
         token_dropout=0.0,
         self_defined_transformer=None,
     ):
@@ -60,11 +65,29 @@ class ViTBackbone(ViTBase):
                 pre_norm=pre_norm,
                 ff_dim=ff_dim,
                 ff_dropout=ff_dropout,
+                attention_dropout=attention_dropout
             )
         )
+        
+        self.use_multihead_attention_pooling = use_multihead_attention_pooling
+        if self.use_multihead_attention_pooling:
+            self.map = ClassMultiheadAttention(
+                dim=dim,
+                heads=num_heads,
+                cat_cls_to_context_at_dim=1 if cat_cls_to_context else None,
+                ff_dropout=ff_dropout,
+                attention_dropout=attention_dropout
+            )
+        else:
+            self.proj = nn.Sequential(
+                nn.Linear(dim, dim),
+                nn.ReLU(),
+                nn.Dropout(ff_dropout),
+            )
 
-    def forward(self, x, attention_mask=None, padding_mask=None):
-        b, c, h, w, p = *x.shape, self.num_patches
+    def forward(self, x):
+        b, c, h, w = x.shape
+        cls_tokens = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
 
         # Divide into flattened patches
         x = self.patch_and_flat(x)
@@ -75,14 +98,22 @@ class ViTBackbone(ViTBase):
         # Token dropout
         x = self.token_dropout(x)
 
-        # Prepend CLS token and add position code
-        CLS = repeat(self.CLS, "1 1 d -> b 1 d", b=b)
-        x = torch.cat([CLS, x], dim=1) + self.position_code
+        # Concatenate CLS if not using multihead attention pooling
+        if not self.use_multihead_attention_pooling:
+            x = torch.cat([cls_tokens, x], dim=1) + self.position_code
         
         # Transformer
-        x = self.transformer(x, attention_mask, padding_mask)
+        x = self.transformer(x)
 
-        return x
+        # Use multihead attention pooling if specified
+        if self.use_multihead_attention_pooling:
+            cls_tokens = self.map(cls_tokens, x)
+            cls_tokens = rearrange(cls_tokens, "b 1 d -> b d")
+        else:
+            cls_tokens = x.select(dim=1, index=0)
+            cls_tokens = self.proj(cls_tokens)
+
+        return cls_tokens
 
 
 class ViTWithLinearClassifier(ViTBackbone):
@@ -97,12 +128,8 @@ class ViTWithLinearClassifier(ViTBackbone):
             act_fnc_name=pred_act_fnc_name
         )
 
-    def forward(self, x, attention_mask=None, padding_mask=None):
-        x = super().forward(x, attention_mask, padding_mask)
-
-        # Projection head
-        # cls_output = x[:, 0, :]
-        cls_output = x.select(dim=1, index=0)
+    def forward(self, x):
+        x = super().forward(x)
         
-        return self.proj_head(cls_output)
+        return self.proj_head(x)
         

@@ -154,3 +154,31 @@ class TalkingHeadAttention(nn.Module):
         out = self.out_linear(out)
 
         return self.out_dropout(out)
+
+
+class ClassMultiheadAttention(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        heads: int,
+        cat_cls_to_context_at_dim: Optional[int] = None,
+        attention_dropout: float = 0.,
+        ff_dropout: float = 0.,
+        **kwargs
+    ) -> None:
+        super().__init__()
+
+        self.attn = MultiheadAttention(
+            dim,
+            heads=heads,
+            attention_dropout=attention_dropout,
+            ff_dropout=ff_dropout,
+            **kwargs
+        )
+        self.cat_cls_to_context_at_dim = cat_cls_to_context_at_dim
+
+    def forward(self, cls_token, context) -> torch.Tensor:
+        if self.cat_cls_to_context_at_dim is not None:
+            context = torch.cat([cls_token, context], dim=self.cat_cls_to_context_at_dim)
+
+        return self.attn((cls_token, context, context))

@@ -14,11 +14,13 @@ class ViTConfig(ConfigBase):
         depth: int,
         num_heads: int,
         num_classes: int,
-        pred_act_fnc_name: str = "ReLU",
+        use_multihead_attention_pooling: bool = True,
+        cat_cls_to_context: bool = False,
         pre_norm: bool = False,
         ff_dim: Optional[int] = None,  # If not specify, ff_dim = 4*dim
         ff_dropout: float = 0.0,
         token_dropout: float = 0.0,
+        pred_act_fnc_name: str = "ReLU",
         self_defined_transformer: Optional[nn.Module] = None,    
     ) -> None:
         super().__init__()
@@ -30,6 +32,8 @@ class ViTConfig(ConfigBase):
         self.depth = depth
         self.num_heads = num_heads
         self.num_classes = num_classes
+        self.use_multihead_attention_pooling = use_multihead_attention_pooling
+        self.cat_cls_to_context = cat_cls_to_context
         self.pred_act_fnc_name = pred_act_fnc_name
         self.pre_norm = pre_norm
         self.ff_dim = ff_dim

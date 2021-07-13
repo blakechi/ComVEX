@@ -5,7 +5,7 @@ from .dropout import TokenWiseDropout, TokenDropout, PathDropout
 from .efficientnet import EfficientNetBase, SeperateConvXd, MBConvXd, EfficientNetBackbone, EfficientNetWithLinearClassifier, EfficientNetConfig
 from .layer_scale import AffineTransform, LayerScale
 from .mixup import MixUp
-from .multihead_attention import MultiheadAttention, TalkingHeadAttention
+from .multihead_attention import MultiheadAttention, TalkingHeadAttention, ClassMultiheadAttention
 from .position_encodings import PositionEncodingFourier
 from .rand_augment import RandAugment, RandAugmentConfig
 from .resnet import ResNetBlockBase, ResNetBlock, ResNetBottleneckBlock, ResNetFullPreActivationBlock, ResNetFullPreActivationBottleneckBlock, ResNetBackBone, ResNetWithLinearClassifier, ResNetConfig
@@ -21,7 +21,7 @@ __all__ = [
     "EfficientNetBase", "SeperateConvXd", "MBConvXd", "EfficientNetBackbone", "EfficientNetWithLinearClassifier", "EfficientNetConfig",
     "AffineTransform", "LayerScale",
     "MixUp",
-    "MultiheadAttention", "TalkingHeadAttention",
+    "MultiheadAttention", "TalkingHeadAttention", "ClassMultiheadAttention",
     "PositionEncodingFourier",
     "RandAugment", "RandAugmentConfig",
     "ResNetBlockBase", "ResNetBlock", "ResNetBottleneckBlock", "ResNetFullPreActivationBlock", "ResNetFullPreActivationBottleneckBlock", "ResNetBackBone", "ResNetWithLinearClassifier", "ResNetConfig",

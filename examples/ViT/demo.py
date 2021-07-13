@@ -8,8 +8,11 @@ from comvex.vit import ViTWithLinearClassifier, ViTConfig
 
 
 if __name__ == "__main__":
-
-    vit_config = ViTConfig.ViT_B(num_classes=10)
+    
+    # Default: Removing CLS from patches and using multihead attention pooling
+    vit_config = ViTConfig.ViT_s_28(num_classes=10)
+    # Original ViT
+    # vit_config = ViTConfig.ViT_s_28(num_classes=10, use_multihead_attention_pooling=False)
     vit = ViTWithLinearClassifier(vit_config)
 
     print(vit)
