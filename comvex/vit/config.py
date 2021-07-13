@@ -38,7 +38,77 @@ class ViTConfig(ConfigBase):
         self.self_defined_transformer = self_defined_transformer
         
     @classmethod
-    def ViT_B(cls, num_classes, **kwargs):
+    def ViT_s_16(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            16,
+            256,
+            6,
+            8,
+            ff_dim=1024,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def ViT_s_28(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            28,
+            256,
+            6,
+            8,
+            ff_dim=1024,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def ViT_S_16(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            16,
+            384,
+            12,
+            6,
+            ff_dim=1536,
+            num_classes=num_classes,
+            **kwargs
+        )
+        
+    @classmethod
+    def ViT_S_32(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            32,
+            384,
+            12,
+            6,
+            ff_dim=1536,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def ViT_Ti_16(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            16,
+            192,
+            12,
+            3,
+            ff_dim=768,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def ViT_B_16(cls, num_classes, **kwargs):
         return cls(
             3,
             224,
@@ -51,7 +121,33 @@ class ViTConfig(ConfigBase):
         )
 
     @classmethod
-    def ViT_L(cls, num_classes, **kwargs):
+    def ViT_B_28(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            28,
+            768,
+            12,
+            12,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def ViT_B_32(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            32,
+            768,
+            12,
+            12,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def ViT_L_16(cls, num_classes, **kwargs):
         return cls(
             3,
             224,
@@ -59,12 +155,13 @@ class ViTConfig(ConfigBase):
             1024,
             24,
             16,
+            ff_dim=4096,
             num_classes=num_classes,
             **kwargs
         )
 
     @classmethod
-    def ViT_B(cls, num_classes, **kwargs):
+    def ViT_H_16(cls, num_classes, **kwargs):
         return cls(
             3,
             224,
@@ -73,6 +170,34 @@ class ViTConfig(ConfigBase):
             32,
             16,
             ff_dim=3072,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def ViT_g_14(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            14,
+            1408,
+            40,
+            16,
+            ff_dim=6144,
+            num_classes=num_classes,
+            **kwargs
+        )
+
+    @classmethod
+    def ViT_G_14(cls, num_classes, **kwargs):
+        return cls(
+            3,
+            224,
+            14,
+            1664,
+            48,
+            16,
+            ff_dim=8192,
             num_classes=num_classes,
             **kwargs
         )
