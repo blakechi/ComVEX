@@ -1,6 +1,6 @@
 # Contribution Guide
 
-Please read through the **Basic Conventions** section first, then depending on your purposes, choose one "If you ..." section to follow.
+Please read through the **Basic Conventions** section first, then depending on your purposes, choose one **"If you ..."** section to follow.
 
 ## Basic Conventions:
 
@@ -24,6 +24,6 @@ Please reference existing models under `comvex` folder when you're implementing 
 
 6. `demo.py` and testing file: Please reference existing ones under `examples` and `tests` (or `tests/template.py`).
 
-## If you find a bug or unclear comments:
+## If you find a bug or unclear comments...
 
 Thanks and happy to accept any!

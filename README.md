@@ -45,6 +45,10 @@ pip3 install comvex
 
 Please check out the **Usage** section detailed in models' own `README.md`.
 
+## How to contribute?
+
+Please check out the **`CONTRIBUTION.md`** for details.
+
 ## Notes
 
 - Continuously implementing models, please check them out under the `comvex` folder for more details and `examples` folder for some demos.
