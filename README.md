@@ -47,7 +47,7 @@ Please check out the **Usage** section detailed in models' own `README.md`.
 
 ## How to contribute?
 
-Please check out the **`CONTRIBUTION.md`** for details.
+Please check out the **`CONTRIBUTING.md`** for details.
 
 ## Notes
 
