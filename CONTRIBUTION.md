@@ -4,7 +4,7 @@ Please read through the **Basic Conventions** section first, then depending on y
 
 ## Basic Conventions:
 
-- Please reference **`What are the pros?`** section in `README.md`.
+- Please reference **`What are the pros?`** section in `README.md` first to know the main ideas.
 
 - Please branch out from the `develop` branch and **never** merge or modifiy the `master`.
 
