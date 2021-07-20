@@ -23,11 +23,12 @@ class AffineTransform(nn.Module):
         return self.alpha*x + self.beta if self.beta is not None else self.alpha*x
 
 
-class LayerScale(AffineTransform):
+class LayerScale(nn.Module):
     r"""
     Layer Scale from CaiT (Figure 1 (d)): https://arxiv.org/abs/2103.17239
 
     Note: We replace `lambda` used in the official paper with `alpha`
+    Note: It only applies `pre_norm` on `x`. To normalize `other_inputs`, please either concatenate with `x` or add extrax normalization layers before `LayerScale`.
     """
     def __init__(
         self, 
@@ -35,15 +36,18 @@ class LayerScale(AffineTransform):
         core_block: Union[nn.Module, str], 
         pre_norm: Union[nn.Module, str] = "LayerNorm", 
         alpha: float = 1e-4, 
-        path_dropout=0., 
+        path_dropout: float = 0., 
         **kwargs  # kwargs for the `core_block`
     ) -> None:
-        super().__init__(dim, alpha=alpha, beta=None)
+        super().__init__()
 
         self.pre_norm = pre_norm(dim) if not isinstance(pre_norm, str) and issubclass(pre_norm, nn.Module) else getattr(nn, pre_norm)(dim)
+        self.aff_transform = torch.jit.script_if_tracing(AffineTransform(dim, alpha, beta=None))
         self.core_block = core_block(dim, **kwargs) if not isinstance(core_block, str) and issubclass(core_block, nn.Module) else getattr(nn, core_block)(dim, **kwargs)
         self.path_dropout = PathDropout(path_dropout)
 
     def forward(self, x: torch.Tensor, *other_inputs) -> torch.Tensor:
-        return x + self.path_dropout(super().forward(self.core_block(self.pre_norm(x), *other_inputs)))
+        transformed_x = self.core_block(self.pre_norm(x), *other_inputs)
+
+        return x + self.path_dropout(self.aff_transform(transformed_x))
         

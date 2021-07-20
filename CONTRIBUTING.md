@@ -10,7 +10,9 @@ Please read through the **Basic Conventions** section first, then depending on y
 
 ## If you want to add new models...
 
-Please reference existing models under `comvex` folder when you're implementing (recommand `convit`). Below are some main points:
+Please reference existing models under `comvex` folder when you're implementing (recommand `convit`). Below are some main steps:
+
+> Note: Please prefix the model's name in commit message. Template: git commit -m "your_model_name - your message".
 
 1. Wrap all your implementation into a folder named with the model's name (all lowercases) under `comvex` folder.
 
