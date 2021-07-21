@@ -12,15 +12,17 @@ try:
 except:
     from torch.jit import Final
 
-from comvex.utils import EfficientNetBase, SeperateConvXd, XXXConvXdBase
+from comvex.utils import EfficientNetBackbone, BiFPN
 from comvex.utils.helpers import get_attr_if_exists, config_pop_argument
-from .bifpn import BiFPN
+from .config import EfficientDetConfig
 
 
-class EfficientDetDetector(nn.Module):
+EfficientDetBackbone = EfficientNetBackbone
+    
+
+class EfficientDet(nn.Module):
     def __init__(
         self,
-        dim: int,
         backbone: nn.Module,
     ) -> None:
         super().__init__()

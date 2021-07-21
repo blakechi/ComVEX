@@ -1,6 +1,7 @@
 from comvex.utils.helpers.functions import get_attr_if_exists
 from typing import Optional, Tuple, Dict
 
+import torch
 from torch import nn
 try:
     from typing_extensions import Final
@@ -51,3 +52,49 @@ class XXXConvXdBase(nn.Module):
         
         return dict([(key, value) for key, value in zip(component_orders.keys(), modules)])
     
+
+class SeperableConvXd(XXXConvXdBase):
+    r"""
+    Reference from: MnasNet (https://arxiv.org/pdf/1807.11626.pdf)
+    """
+
+    def __init__(
+        self, 
+        in_channel: int, 
+        out_channel: int, 
+        kernel_size: int = 3, 
+        padding: int = 1, 
+        kernels_per_layer: int = 1, 
+        dimension: int = 2,
+        act_fnc_name: str = "ReLU",
+        extra_components: Dict[str, str] = {"norm", "BatchNorm"},
+        **kwargs  # For the normalization layer
+    ) -> None:
+        super().__init__(in_channel, out_channel, dimension=dimension, extra_components=extra_components)
+
+        self.depth_wise_conv = self.conv(
+            self.in_channel, 
+            self.in_channel*kernels_per_layer, 
+            kernel_size, 
+            padding=padding, 
+            groups=self.in_channel
+        )
+        self.pixel_wise_conv = self.conv(
+            self.in_channel*kernels_per_layer,
+            out_channel,
+            kernel_size=1,
+        ),
+        self.norm_layer = self.norm(
+            self.in_channel*kernels_per_layer,
+            **kwargs
+        ),
+        self.act_fnc = get_attr_if_exists(nn, act_fnc_name)()
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.depth_wise_conv(x)
+        x = self.pixel_wise_conv(x)
+        
+        x = self.norm_layer(x)
+        x = self.act_fnc(x)
+        
+        return x

@@ -10,7 +10,7 @@ try:
 except:
     from torch.jit import Final
 
-from comvex.utils import SeperateConvXd, XXXConvXdBase
+from comvex.utils import SeperableConvXd, XXXConvXdBase
 
 
 @torch.jit.script
@@ -34,6 +34,7 @@ class BiFPNResizeXd(XXXConvXdBase):
 
     Support 1, 2, or 3D inputs.
     """
+
     def __init__(
         self,
         in_channel: int,
@@ -108,7 +109,7 @@ class BiFPNNode(nn.Module):
             use_batch_norm,
             possible_batch_norm_kwargs
         )
-        self.conv = SeperateConvXd(
+        self.conv = SeperableConvXd(
             in_channel,
             out_channel,
             dimension=dimension,

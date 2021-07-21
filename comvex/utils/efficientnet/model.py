@@ -95,58 +95,6 @@ class EfficientNetBase(nn.Module):
         return new_filters
 
 
-class SeperateConvXd(XXXConvXdBase):
-    r"""
-    Reference from: MnasNet (https://arxiv.org/pdf/1807.11626.pdf)
-    """
-
-    def __init__(
-        self, 
-        in_channel: int, 
-        out_channel: int, 
-        kernel_size: int = 3, 
-        padding: int = 1, 
-        kernels_per_layer: int = 1, 
-        norm_layer_name: str = "BatchNorm2d",
-        act_fnc_name: str = "ReLU",
-        dimension: int = 2,
-        **kwargs  # For the normalization layer
-    ) -> None:
-        super().__init__(in_channel, out_channel, dimension=dimension)
-
-        self.depth_wise_conv = nn.Sequential(
-            self.conv(
-                self.in_channel, 
-                self.in_channel*kernels_per_layer, 
-                kernel_size, 
-                padding=padding, 
-                groups=self.in_channel
-            ),
-            get_attr_if_exists(nn, norm_layer_name)(
-                self.in_channel*kernels_per_layer,
-                **kwargs
-            ),
-            get_attr_if_exists(nn, act_fnc_name)()
-        )
-        self.pixel_wise_conv = nn.Sequential(
-            self.conv(
-                self.in_channel*kernels_per_layer,
-                out_channel,
-                kernel_size=1,
-            ),
-            get_attr_if_exists(nn, norm_layer_name)(
-                self.in_channel*kernels_per_layer,
-                **kwargs
-            )
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.depth_wise_conv(x)
-        x = self.pixel_wise_conv(x)
-
-        return x
-
-
 class SEConvXd(XXXConvXdBase):
     r"""
     Squeeze-and-Excitation Convolution 
