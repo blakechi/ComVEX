@@ -20,7 +20,7 @@ class ResMLPLayer(nn.Module):
     ):
         super().__init__()
 
-        self.token_mixer = nn.Sequential(OrderedDict([
+        self.cross_patch = nn.Sequential(OrderedDict([
             ("aff_pre_norm", AffineTransform(dim)),
             ("transpose_0", Rearrange("b n d -> b d n")),
             ("linear", nn.Linear(num_patches, num_patches)),
@@ -28,7 +28,7 @@ class ResMLPLayer(nn.Module):
             ("aff_post_norm", AffineTransform(dim, alpha=alpha, beta=None)),
             ("path_dropout", PathDropout(path_dropout))
         ]))
-        self.channel_mixer = LayerScaleBlock(
+        self.cross_channel = LayerScaleBlock(
             dim, 
             core_block=MLP, 
             pre_norm=AffineTransform, 
@@ -39,8 +39,8 @@ class ResMLPLayer(nn.Module):
         )
 
     def forward(self, x):
-        x = x + self.token_mixer(x)
-        x = x + self.channel_mixer(x)
+        x = x + self.cross_patch(x)
+        x = x + self.cross_channel(x)
 
         return x
 
