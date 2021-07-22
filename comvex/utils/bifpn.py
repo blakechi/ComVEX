@@ -163,7 +163,7 @@ class BiFPNOutputNode(BiFPNNode):
 
 class BiFPNLayer(nn.Module):
     r"""BiFPNLayer
-    One block in Figure. 2(d) in the official paper.
+    The same in Figure. 3 of the official paper.
     """
 
     num_nodes: Final[int]

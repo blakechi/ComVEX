@@ -15,14 +15,37 @@ except:
 from comvex.utils import EfficientNetBackbone, BiFPN
 from comvex.utils.helpers import get_attr_if_exists, config_pop_argument
 from .config import EfficientDetConfig
-
-
-EfficientDetBackbone = EfficientNetBackbone
     
 
-class EfficientDet(nn.Module):
+class EfficientDetBackbone(nn.Module):
+    r"""
+    `EfficientNetBackbone` + `BiFPN`
+    """
+    
     def __init__(
         self,
         backbone: nn.Module,
+    ) -> None:
+        super().__init__()
+
+
+class EfficientDetForObjectDetection(nn.Module):
+    r"""
+    
+    """
+    
+    def __init__(
+        self,
+    ) -> None:
+        super().__init__()
+
+
+class EfficientDetForSemanticSegmentation(nn.Module):
+    r"""
+
+    """
+    
+    def __init__(
+        self,
     ) -> None:
         super().__init__()

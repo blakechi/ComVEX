@@ -106,18 +106,20 @@ class SEConvXd(XXXConvXdBase):
         in_channel: int,
         bottleneck_channel: int,
         out_channel: Optional[int] = None,
-        se_act_fnc_name: Optional[str] = None,
+        se_act_fnc_name: str = "ReLU",
         dimension: int = 2,
+        pool_name_without_dim: Literal["AdaptiveMaxPool", "AdaptiveAvgPool"] = "AdaptiveMaxPool",
     ) -> None:
-        super().__init__(in_channel, out_channel, dimension=dimension)
+        extra_components = { "pool": pool_name_without_dim}
+        super().__init__(in_channel, out_channel, dimension=dimension, extra_components=extra_components)
 
-        self.layers = nn.Sequential(
-            nn.AdaptiveMaxPool2d((1, 1)),
-            self.conv(self.in_channel, bottleneck_channel, 1),
-            get_attr_if_exists(nn, se_act_fnc_name)(),
-            self.conv(bottleneck_channel, self.out_channel, 1),
-            nn.Sigmoid(),
-        )
+        self.layers = nn.Sequential(OrderedDict([
+            ("squeeze", self.pool((1, 1))),
+            ("excitation_conv_0", self.conv(self.in_channel, bottleneck_channel, 1)),
+            ("excitation_act_fnc_0", get_attr_if_exists(nn, se_act_fnc_name)()),
+            ("excitation_conv_1", self.conv(bottleneck_channel, self.out_channel, 1)),
+            ("excitation_act_fnc_1", nn.Sigmoid()),
+        ]))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x*self.layers(x)        
