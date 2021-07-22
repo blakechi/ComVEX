@@ -1,3 +1,4 @@
+import os
 import gc
 import torch
 from .utils import *
@@ -7,9 +8,10 @@ from .utils import *
 
 # === Instantiate your Model ===
 # - For single model
+model_name = os.path.basename(__file__).replace("test_", "").replace(".py", "")
 model = None
 # - For specializations
-# specializations = [attr for attr in dir(__your_config_class_object__) if attr.startswith(__your_model_name_string__)]
+# specializations = [attr for attr in dir(__your_config_class_object__) if attr.startswith(model_name)]
 
 # === Settings ===
 # - Required:

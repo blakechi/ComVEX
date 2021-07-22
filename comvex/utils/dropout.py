@@ -32,7 +32,7 @@ def dimension_wise_dropout(x: torch.Tensor, dropout_rate: float = .0, dim: int =
     ), f"[dimension_wise_dropout] Dropout rate should be greater than 0 and less than 1, but got {dropout_rate}"
 
     keep_rate = 1. - dropout_rate
-    shape = (1,)*x.ndim
+    shape = [1,]*x.ndim
     shape[dim] = x.shape[dim]
     mask = (torch.rand(shape, dtype=x.dtype, device=x.device) + keep_rate).floor_()
 
@@ -102,6 +102,9 @@ class TokenDropout(TokenWiseDropout):
 
 
 class PathDropout(nn.Module):
+    r"""
+    Deep Networks with Stochastic Depth (https://arxiv.org/pdf/1603.09382.pdf)
+    """
     def __init__(self, p: float = 0.) -> None:  
         super().__init__()
         self.dropout_rate = p
@@ -112,3 +115,6 @@ class PathDropout(nn.Module):
             x (b, ...): The inpute tensor. Assume `batch` is at dimension 0.
         """
         return dimension_wise_dropout(x, self.dropout_rate, 0, training=self.training)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.dropout_rate})"

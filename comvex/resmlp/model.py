@@ -4,7 +4,7 @@ from torch import nn
 from einops.layers.torch import Rearrange, Reduce
 
 from comvex.vit import ViTBase
-from comvex.utils import MLP, AffineTransform, LayerScaleBlock, TokenDropout, PathDropout
+from comvex.utils import MLP, AffineTransform, LayerScale, TokenDropout, PathDropout
 from comvex.utils.helpers import config_pop_argument
 from .config import ResMLPConfig
 
@@ -28,13 +28,13 @@ class ResMLPLayer(nn.Module):
             ("aff_post_norm", AffineTransform(dim, alpha=alpha, beta=None)),
             ("path_dropout", PathDropout(path_dropout))
         ]))
-        self.cross_channel = LayerScaleBlock(
+        self.cross_channel = LayerScale(
             dim, 
             core_block=MLP, 
             pre_norm=AffineTransform, 
             alpha=alpha, 
             path_dropout=path_dropout,
-            hidden_dim=4*dim,
+            expand_scale=4,
             ff_dropout=ff_dropout
         )
 

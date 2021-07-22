@@ -4,8 +4,9 @@ from torch.utils.checkpoint import checkpoint
 from einops import rearrange
 from einops.layers.torch import Rearrange, Reduce
 
-from .config import SwinTransformerConfig
 from comvex.utils import LayerNorm, FeedForward, ProjectionHead, TokenDropout, PathDropout
+from comvex.utils.helpers.functions import config_pop_argument, name_with_msg
+from .config import SwinTransformerConfig
 
 
 class SwinTransformerBase(nn.Module):
@@ -27,7 +28,7 @@ class SwinTransformerBase(nn.Module):
 
         assert (
             (self.num_patches**0.5) * patch_size == image_size
-        ), f"[{self.__class__.__name__}] Image size must be divided by the patch size."
+        ), name_with_msg(self, "Image size must be divided by the patch size.")
 
         self.patch_and_flat = Rearrange("b c (h p) (w q) -> b (h w) (p q c)", p=self.patch_size, q=self.patch_size)
 
@@ -227,7 +228,7 @@ class SwinTransformerLayer(nn.Module):
 
         self.ff_block = LayerNorm(
             FeedForward(
-                dim=dim, hidden_dim=ff_dim if ff_dim is not None else 4*dim, **kwargs
+                dim=dim, expand_dim=ff_dim if ff_dim is not None else 4*dim, **kwargs
             ),
             dim=dim,
             use_pre_norm=use_pre_norm
@@ -368,12 +369,14 @@ class SwinTransformerBackbone(SwinTransformerBase):
 
 class SwinTransformerWithLinearClassifier(SwinTransformerBackbone):
     def __init__(self, config: SwinTransformerConfig = None) -> None:
+        num_classes = config_pop_argument(config, "num_classes")
+        pred_act_fnc_name = config_pop_argument(config, "pred_act_fnc_name")
         super().__init__(**config.__dict__)
 
         self.proj_head = ProjectionHead(
-            self.num_channels * 2**(3),
-            config.num_classes,
-            config.pred_act_fnc_name,
+            self.num_channels * (2**3),
+            num_classes,
+            pred_act_fnc_name,
         )
 
     def forward(self, x: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:

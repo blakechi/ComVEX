@@ -16,12 +16,12 @@ class MLPMixerLayer(nn.Module):
         self.token_mixer = nn.Sequential(
             nn.LayerNorm(num_channels),
             Rearrange("b s c -> b c s"),
-            MLP(num_tokens, token_mlp_dim, ff_dropout=ff_dropout),
+            MLP(num_tokens, expand_dim=token_mlp_dim, ff_dropout=ff_dropout),
             Rearrange("b c s -> b s c"),
         )
         self.channel_mixer = nn.Sequential(
             nn.LayerNorm(num_channels),
-            MLP(num_channels, channel_mlp_dim, ff_dropout=ff_dropout)
+            MLP(num_channels, expand_dim=channel_mlp_dim, ff_dropout=ff_dropout)
         )
 
     def forward(self, x):
