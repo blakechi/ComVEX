@@ -68,6 +68,7 @@ class SeperableConvXd(XXXConvXdBase):
         dimension: int = 2,
         act_fnc_name: str = "ReLU",
         extra_components: Dict[str, str] = {"norm", "BatchNorm"},
+        use_conv_only: bool = False,
         **kwargs  # For the normalization layer
     ) -> None:
         super().__init__(in_channel, out_channel, dimension=dimension, extra_components=extra_components)
@@ -83,18 +84,22 @@ class SeperableConvXd(XXXConvXdBase):
             self.in_channel*kernels_per_layer,
             out_channel,
             kernel_size=1,
-        ),
-        self.norm_layer = self.norm(
-            self.in_channel*kernels_per_layer,
-            **kwargs
-        ),
-        self.act_fnc = get_attr_if_exists(nn, act_fnc_name)()
+        )
+
+        self.use_conv_only = use_conv_only
+        if not self.use_conv_only:
+            self.norm_layer = self.norm(
+                self.in_channel*kernels_per_layer,
+                **kwargs
+            )
+            self.act_fnc = get_attr_if_exists(nn, act_fnc_name)()
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.depth_wise_conv(x)
         x = self.pixel_wise_conv(x)
         
-        x = self.norm_layer(x)
-        x = self.act_fnc(x)
+        if self.use_conv_only:
+            x = self.norm_layer(x)
+            x = self.act_fnc(x)
         
         return x
