@@ -1,6 +1,6 @@
 from comvex.utils.helpers.functions import name_with_msg
 from collections import OrderedDict
-from typing import Literal, List, Tuple
+from typing import Literal, List, Tuple, Optional
 
 import torch
 from torch import nn
@@ -11,6 +11,7 @@ except:
     from torch.jit import Final
 
 from comvex.utils import SeperableConvXd, XXXConvXdBase
+from comvex.utils.helpers import get_conv_layer
 
 
 @torch.jit.script
@@ -43,8 +44,8 @@ class BiFPNResizeXd(XXXConvXdBase):
         out_shape: Tuple[int],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
+        use_conv_after_downsampling: bool = True,
         use_bias: bool = False,
-        use_batch_norm: bool = False,
         **possible_batch_norm_kwargs
     ) -> None:
 
@@ -57,28 +58,32 @@ class BiFPNResizeXd(XXXConvXdBase):
         ), name_with_msg(f"`Elements in `in_shape` must be all larger or small than `out_shape`. But got: `in_shape` = {in_shape} and `out_shape` = {out_shape}")
 
         extra_components = { "max_pool": "AdaptiveMaxPool" } 
-        extra_components = { **extra_components, "batch_norm": "BatchNorm" } if use_batch_norm else extra_components
+        extra_components = { **extra_components, "batch_norm": "BatchNorm" } if use_conv_after_downsampling else extra_components
         super().__init__(in_channel, out_channel, dimension, extra_components=extra_components)
         
         if in_shape[0] > out_shape[0]:  # downsampling
             self.interpolate_shape = self.max_pool(out_shape)
+            self.downsampling = True
+            self.use_conv_after_downsampling = use_conv_after_downsampling
+            if self.use_conv_after_downsampling:
+                self.proj_channel = self.conv(in_channel, out_channel, kernel_size=1, use_bias=use_bias)
+                self.norm = self.batch_norm(out_channel, **possible_batch_norm_kwargs)
         else:  # upsampling
+            self.downsampling = False
             self.interpolate_shape = nn.Upsample(out_shape, mode=upsample_mode, align_corners=True)
 
-        self.proj_channel = self.conv(in_channel, out_channel, kernel_size=1, use_bias=use_bias)
-        self.norm = self.batch_norm(out_channel, **possible_batch_norm_kwargs) if use_batch_norm else None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.interpolate_shape(x)
-        x = self.proj_channel(x)
 
-        if self.norm is not None:
+        if self.downsampling and self.use_conv_after_downsampling:
+            x = self.proj_channel(x)
             x = self.norm(x)
 
         return x
 
 
-class BiFPNNode(nn.Module):
+class BiFPNNodeBase(nn.Module):
     r"""
     Referennce from: https://github.com/google/automl/blob/0fb012a80487f0defa4446957c8faf878cd9b75b/efficientdet/efficientdet_arch.py#L418-L475
     """
@@ -97,6 +102,13 @@ class BiFPNNode(nn.Module):
         **possible_batch_norm_kwargs
     ) -> None:
         super().__init__()
+
+        # Project features' channels only at the intermediae nodes of the first layer in BiFPN to `bifpn_channel`
+        self.proj_feature_channel = get_conv_layer(f"Conv{dimension}d")(
+            in_channel,
+            out_channel,
+            kernel_size=1,
+        ) if in_channel != out_channel else nn.Identity()
 
         self.resize = BiFPNResizeXd(
             in_channel,
@@ -129,15 +141,15 @@ class BiFPNNode(nn.Module):
             self.weights = nn.Parameter(torch.ones(num_inputs))
 
 
-class BiFPNIntermediateNode(BiFPNNode):
+class BiFPNIntermediateNode(BiFPNNodeBase):
     def __init__(
         self,
         **kwargs,
     ) -> None:
-        
         super().__init__(num_inputs=2, **kwargs)
 
     def forward(self, x: torch.Tensor, x_diff: torch.Tensor) -> torch.Tensor:
+        x = self.proj_feature_channel(x)
         x_diff = self.resize(x_diff)
         x_stack = torch.stack([x, x_diff], dim=0)
 
@@ -147,7 +159,7 @@ class BiFPNIntermediateNode(BiFPNNode):
 BiFPNOutputEndPoint = BiFPNIntermediateNode  #The start and end nodes in the outputs
 
 
-class BiFPNOutputNode(BiFPNNode):
+class BiFPNOutputNode(BiFPNNodeBase):
     def __init__(
         self,
         **kwargs,
@@ -155,6 +167,7 @@ class BiFPNOutputNode(BiFPNNode):
         super().__init__(num_inputs=3, **kwargs)
 
     def forward(self, x: torch.Tensor, x_hidden: torch.Tensor, x_diff: torch.Tensor) -> torch.Tensor:
+        x = self.proj_feature_channel(x)
         x_diff = self.resize(x_diff)
         x_stack = torch.stack([x, x_hidden, x_diff], dim=0)
 
@@ -170,15 +183,12 @@ class BiFPNLayer(nn.Module):
 
     def __init__(
         self,
+        bifpn_channel: int,
         shapes_in_stages: List[Tuple[int]],
-        channels_in_stages: List[int],
+        channels_in_stages: Optional[List[int]] = None,
         **kwargs,
     ) -> None:
         super().__init__()
-        
-        assert (
-            len(shapes_in_stages) == len(channels_in_stages)
-        ), name_with_msg(f"The length of `shapes_in_stages` and `channels_in_stages` must be equal. But got: {len(shapes_in_stages)} for stages and {len(shapes_in_stages)} for channels.")
 
         self.num_nodes = len(shapes_in_stages)
 
@@ -186,8 +196,8 @@ class BiFPNLayer(nn.Module):
             (
                 f"intermediate_node_{idx}",
                 BiFPNIntermediateNode(
-                    in_channel=channels_in_stages[idx + 1],  # Channel of the feature map comes from deeper layers.
-                    out_channel=channels_in_stages[idx],
+                    in_channel=channels_in_stages[idx + 1] if channels_in_stages is not None else bifpn_channel,  # Channel of the feature map comes from deeper layers.
+                    out_channel=bifpn_channel,
                     in_shape=shapes_in_stages[idx + 1],
                     out_shape=shapes_in_stages[idx],
                     **kwargs
@@ -198,14 +208,14 @@ class BiFPNLayer(nn.Module):
             (
                 f"output_node_{idx}",
                 BiFPNOutputEndPoint(
-                    in_channel=channels_in_stages[idx + 1] if idx == 0 else channels_in_stages[idx - 1],
-                    out_channel=channels_in_stages[idx],
+                    in_channel=bifpn_channel,
+                    out_channel=bifpn_channel,
                     in_shape=shapes_in_stages[idx + 1] if idx ==0 else shapes_in_stages[idx - 1],
                     out_shape=shapes_in_stages[idx],
                     **kwargs
                 ) if idx == 0 or idx == self.num_nodes else BiFPNOutputNode(
-                    in_channel=channels_in_stages[idx - 1],  # Channel of the feature map comes from shallower layers.
-                    out_channel=channels_in_stages[idx],
+                    in_channel=bifpn_channel,
+                    out_channel=bifpn_channel,
                     in_shape=shapes_in_stages[idx - 1],
                     out_shape=shapes_in_stages[idx],
                     **kwargs
@@ -246,6 +256,7 @@ class BiFPN(nn.Module):
     def __init__(
         self,
         num_layers: int,
+        bifpn_channel: int,
         shapes_in_stages: List[Tuple[int]],
         channels_in_stages: List[int],
         dimension: int = 2,
@@ -257,12 +268,17 @@ class BiFPN(nn.Module):
     ) -> None:
         super().__init__()
 
+        assert (
+            len(shapes_in_stages) == len(channels_in_stages)
+        ), name_with_msg(f"The length of `shapes_in_stages` and `channels_in_stages` must be equal. But got: {len(shapes_in_stages)} for shapes and {len(channels_in_stages)} for channels.")
+
         self.layers = nn.ModuleList(OrderedDict([
             (
                 f"layer_{idx}",
                 BiFPNLayer(
+                    bifpn_channel,
                     shapes_in_stages,
-                    channels_in_stages,
+                    channels_in_stages if idx == 0 else None,
                     dimension,
                     upsample_mode,
                     use_bias,
