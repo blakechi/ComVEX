@@ -66,7 +66,7 @@ class BiFPNResizeXd(XXXConvXdBase):
             self.interpolate_shape = nn.Upsample(out_shape, mode=upsample_mode, align_corners=True)
 
         self.proj_channel = self.conv(in_channel, out_channel, kernel_size=1, use_bias=use_bias)
-        self.norm = self.batch_norm(in_channel, **possible_batch_norm_kwargs) if use_batch_norm else None
+        self.norm = self.batch_norm(out_channel, **possible_batch_norm_kwargs) if use_batch_norm else None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.interpolate_shape(x)

@@ -14,9 +14,12 @@ except:
     from torch.jit import Final
 
 from comvex.utils import EfficientNetBackbone, BiFPN, SeperableConvXd
-from comvex.utils.helpers import get_norm_layer, get_act_fnc get_attr_if_exists, config_pop_argument
+from comvex.utils.helpers import get_norm_layer, get_act_fnc, get_attr_if_exists, config_pop_argument
 from .config import EfficientDetConfig
  
+
+_DEFAULT_ACT_FNC = "SiLU"
+
 
 class EfficientDetPredictionHead(nn.Module):
     def __init__(
@@ -26,7 +29,7 @@ class EfficientDetPredictionHead(nn.Module):
         in_channel: int,
         out_channel: int,
         dimension: int = 2,
-        act_fnc_name: str = "ReLU",
+        act_fnc_name: str = _DEFAULT_ACT_FNC,
         use_seperable_conv: bool = True,
         path_dropout: float = 0.,
     ) -> None:
@@ -77,7 +80,7 @@ class EfficientDetClassNet(nn.Module):
         num_classes: int,
         num_anchors: int,
         dimension: int = 2,
-        act_fnc_name: str = "ReLU",
+        act_fnc_name: str = _DEFAULT_ACT_FNC,
         use_seperable_conv: bool = True,
         path_dropout: float = 0.,
     ) -> None:
@@ -106,7 +109,7 @@ class EfficientDetBoxNet(nn.Module):
         feature_map_channel: int,
         num_anchors: int,
         dimension: int = 2,
-        act_fnc_name: str = "ReLU",
+        act_fnc_name: str = _DEFAULT_ACT_FNC,
         use_seperable_conv: bool = True,
         path_dropout: float = 0.,
     ) -> None:
