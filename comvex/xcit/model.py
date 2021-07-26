@@ -164,14 +164,6 @@ class XCiTLayer(nn.Module):
     ) -> None:
         super().__init__()
 
-        self.lpi = LayerScale(
-            dim,
-            alpha=alpha,
-            path_dropout=path_dropout,
-            core_block=LocalPatchInteraction,
-            kernel_size=kernel_size,
-            act_fnc_name=act_fnc_name
-        )
         self.xca = LayerScale(
             dim,
             alpha=alpha,
@@ -183,6 +175,14 @@ class XCiTLayer(nn.Module):
             attention_dropout=attention_dropout,
             ff_dropout=ff_dropout
         )
+        self.lpi = LayerScale(
+            dim,
+            alpha=alpha,
+            path_dropout=path_dropout,
+            core_block=LocalPatchInteraction,
+            kernel_size=kernel_size,
+            act_fnc_name=act_fnc_name
+        )
         self.ff = LayerScale(
             dim,
             alpha=alpha,
@@ -193,8 +193,8 @@ class XCiTLayer(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, pH: int, pW: int) -> torch.Tensor:
-        self.lpi(x, pH, pW)
         self.xca(x)
+        self.lpi(x, pH, pW)
         self.ff(x)
 
         return x
