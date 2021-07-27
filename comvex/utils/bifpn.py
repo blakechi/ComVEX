@@ -10,7 +10,7 @@ try:
 except:
     from torch.jit import Final
 
-from comvex.utils import SeperableConvXd, XXXConvXdBase
+from comvex.utils import SeperableConvXd, XXXConvXdBase, ConfigBase
 from comvex.utils.helpers import get_conv_layer
 
 
@@ -29,6 +29,59 @@ def bifpn_softmax(x, weights, dim=0):
     return (x*weights).sum(dim=0)
 
 
+class BiFPNConfig(ConfigBase):
+    def __init__(
+        self,
+        num_layers: int,
+        bifpn_channel: int,
+        channels_in_stages: List[int],
+        shapes_in_stages: Optional[List[Tuple[int]]] = None,
+        shape_scales: Optional[List[int]] = None,
+        image_shape: Optional[Tuple[int]] = None,
+        dimension: int = 2,
+        upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
+        use_bias: bool = False,
+        use_batch_norm: bool = False,
+        norm_mode: Literal["fast_norm", "softmax", "channel_fast_norm", "channel_softmax"] = "fast_norm",
+        batch_norm_epsilon: float = 1e-5,
+        batch_norm_momentum: float = 1e-1,
+    ) -> None:
+        super().__init__()
+
+        assert (
+            shapes_in_stages is not None or shape_scales is not None
+        ), name_with_msg("Either `shapes_in_shapes` or `shape_scales` should be specified")
+
+        if shape_scales is not None:
+            assert (
+                image_shape is not None
+            ), name_with_msg("`image_shape` should be specified together with `shape_scales`")
+
+            shapes_in_stages = [(image_shape[0] // scale, image_shape[1] // scale) for scale in shape_scales]
+
+        self.num_layers = num_layers
+        self.bifpn_channel = bifpn_channel
+        self.shapes_in_stages = shapes_in_stages 
+        self.channels_in_stages = channels_in_stages
+        self.dimension = dimension
+        self.upsample_mode = upsample_mode
+        self.use_bias = use_bias
+        self.use_batch_norm = use_batch_norm
+        self.norm_mode = norm_mode
+        self.batch_norm_epsilon = batch_norm_epsilon
+        self.batch_norm_momentum = batch_norm_momentum
+
+    @classmethod
+    def BiFPN_Default(cls, num_layers: int, bifpn_channel: int, channels_in_stages: List[int], image_shape: Tuple[int], **kwargs) -> "BiFPNConfig":
+        return cls(
+            num_layers,
+            bifpn_channel,
+            channels_in_stages,
+            shape_scales=[8, 16, 32, 64, 128],
+            image_shape=image_shape
+        )
+        
+
 class BiFPNResizeXd(XXXConvXdBase):
     r"""The `Resize` in equations of Section 3.3 in the official paper.
     Reference from: https://github.com/google/automl/blob/0fb012a80487f0defa4446957c8faf878cd9b75b/efficientdet/efficientdet_arch.py#L55-L95.
@@ -46,7 +99,8 @@ class BiFPNResizeXd(XXXConvXdBase):
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
         use_conv_after_downsampling: bool = True,
         use_bias: bool = False,
-        **possible_batch_norm_kwargs
+        batch_norm_epsilon: float = 1e-5,
+        batch_norm_momentum: float = 1e-1,
     ) -> None:
 
         assert (
@@ -67,7 +121,11 @@ class BiFPNResizeXd(XXXConvXdBase):
             self.use_conv_after_downsampling = use_conv_after_downsampling
             if self.use_conv_after_downsampling:
                 self.proj_channel = self.conv(in_channel, out_channel, kernel_size=1, use_bias=use_bias)
-                self.norm = self.batch_norm(out_channel, **possible_batch_norm_kwargs)
+                self.norm = self.batch_norm(
+                    out_channel,
+                    eps=batch_norm_epsilon,
+                    momentum=batch_norm_momentum,
+                )
         else:  # upsampling
             self.downsampling = False
             self.interpolate_shape = nn.Upsample(out_shape, mode=upsample_mode, align_corners=True)
@@ -119,7 +177,7 @@ class BiFPNNodeBase(nn.Module):
             upsample_mode,
             use_bias,
             use_batch_norm,
-            possible_batch_norm_kwargs
+            **possible_batch_norm_kwargs
         )
         self.conv = SeperableConvXd(
             in_channel,
@@ -186,7 +244,7 @@ class BiFPNLayer(nn.Module):
         bifpn_channel: int,
         shapes_in_stages: List[Tuple[int]],
         channels_in_stages: Optional[List[int]] = None,
-        **kwargs,
+        **possible_batch_norm_kwargs,
     ) -> None:
         super().__init__()
 
@@ -200,7 +258,7 @@ class BiFPNLayer(nn.Module):
                     out_channel=bifpn_channel,
                     in_shape=shapes_in_stages[idx + 1],
                     out_shape=shapes_in_stages[idx],
-                    **kwargs
+                    **possible_batch_norm_kwargs
                 )
             ) for idx in range(1, self.num_nodes - 1)
         ]))
@@ -212,13 +270,13 @@ class BiFPNLayer(nn.Module):
                     out_channel=bifpn_channel,
                     in_shape=shapes_in_stages[idx + 1] if idx ==0 else shapes_in_stages[idx - 1],
                     out_shape=shapes_in_stages[idx],
-                    **kwargs
+                    **possible_batch_norm_kwargs
                 ) if idx == 0 or idx == self.num_nodes else BiFPNOutputNode(
                     in_channel=bifpn_channel,
                     out_channel=bifpn_channel,
                     in_shape=shapes_in_stages[idx - 1],
                     out_shape=shapes_in_stages[idx],
-                    **kwargs
+                    **possible_batch_norm_kwargs
                 )
             ) for idx in range(self.num_nodes)
         ]))
@@ -264,7 +322,8 @@ class BiFPN(nn.Module):
         use_bias: bool = False,
         use_batch_norm: bool = False,
         norm_mode: Literal["fast_norm", "softmax", "channel_fast_norm", "channel_softmax"] = "fast_norm",
-        **possible_batch_norm_kwargs
+        batch_norm_epsilon: float = 1e-5,
+        batch_norm_momentum: float = 1e-1
     ) -> None:
         super().__init__()
 
@@ -284,7 +343,8 @@ class BiFPN(nn.Module):
                     use_bias,
                     use_batch_norm,
                     norm_mode,
-                    **possible_batch_norm_kwargs
+                    batch_norm_epsilon=batch_norm_epsilon,
+                    batch_norm_momentum=batch_norm_momentum
                 )
             ) for idx in range(num_layers)
         ]))

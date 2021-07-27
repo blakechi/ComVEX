@@ -1,2 +1,2 @@
 from .model import EfficientNetBase, SEConvXd, MBConvXd, EfficientNetBackbone, EfficientNetWithLinearClassifier
-from .config import EfficientNetConfig
+from .config import EfficientNetBackboneConfig, EfficientNetConfig

@@ -69,7 +69,8 @@ class SeperableConvXd(XXXConvXdBase):
         act_fnc_name: str = "ReLU",
         extra_components: Dict[str, str] = {"norm", "BatchNorm"},
         use_conv_only: bool = False,
-        **kwargs  # For the normalization layer
+        batch_norm_epsilon: float = 1e-5,
+        batch_norm_momentum: float = 1e-1,
     ) -> None:
         super().__init__(in_channel, out_channel, dimension=dimension, extra_components=extra_components)
 
@@ -90,7 +91,8 @@ class SeperableConvXd(XXXConvXdBase):
         if not self.use_conv_only:
             self.norm_layer = self.norm(
                 self.in_channel*kernels_per_layer,
-                **kwargs
+                eps=batch_norm_epsilon,
+                momentum=batch_norm_momentum
             )
             self.act_fnc = get_attr_if_exists(nn, act_fnc_name)()
         

@@ -13,7 +13,7 @@ try:
 except:
     from torch.jit import Final
 
-from comvex.utils import EfficientNetBackbone, BiFPN, SeperableConvXd
+from comvex.utils import EfficientNetConfig, EfficientNetBackbone, BiFPN, SeperableConvXd
 from comvex.utils.helpers import get_norm_layer, get_act_fnc, get_attr_if_exists, config_pop_argument
 from .config import EfficientDetConfig
  
@@ -75,10 +75,10 @@ class EfficientDetClassNet(nn.Module):
     def __init__(
         self,
         num_layers: int,
-        num_feature_maps: int,
-        feature_map_channel: int,
         num_classes: int,
         num_anchors: int,
+        feature_map_channel: int,
+        num_feature_maps: int = 5,
         dimension: int = 2,
         act_fnc_name: str = _DEFAULT_ACT_FNC,
         use_seperable_conv: bool = True,
@@ -105,9 +105,9 @@ class EfficientDetBoxNet(nn.Module):
     def __init__(
         self,
         num_layers: int,
-        num_feature_maps: int,
-        feature_map_channel: int,
         num_anchors: int,
+        feature_map_channel: int,
+        num_feature_maps: int = 5,
         dimension: int = 2,
         act_fnc_name: str = _DEFAULT_ACT_FNC,
         use_seperable_conv: bool = True,
@@ -137,25 +137,78 @@ class EfficientDetBackbone(nn.Module):
     
     def __init__(
         self,
-        backbone: nn.Module,
+        efficientnet_config: EfficientNetConfig,
+        bifpn_num_layers: int,
+        bifpn_channel: int,
+        shapes_in_stages: List[Tuple[int]],
+        channels_in_stages: List[int],
+        dimension: int = 2,
+        upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
+        use_bias: bool = False,
+        use_batch_norm: bool = False,
+        norm_mode: Literal["fast_norm", "softmax", "channel_fast_norm", "channel_softmax"] = "fast_norm",
     ) -> None:
         super().__init__()
+
+        self.efficentnet_backbone = EfficientNetBackbone(
+            return_feature_maps=True,
+            **efficientnet_config.__dict__
+        )
+        self.bifpn = BiFPN(
+            bifpn_num_layers,
+            bifpn_channel,
+            shapes_in_stages,
+            channels_in_stages,
+            dimension,
+            upsample_mode,
+            use_bias,
+            use_batch_norm,
+            norm_mode
+        )
+
+    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
+        feature_map_dict = self.efficentnet_backbone(x)
+
+        feature_maps = [feature_map for feature_map in feature_map_dict.values()]
+        feature_maps = self.bifpn(feature_maps)
+
+        return feature_maps
 
 
 class EfficientDetForObjectDetection(nn.Module):
     r"""
-    
     """
     
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self, config: EfficientDetConfig) -> None:
         super().__init__()
+
+        self.backbone = EfficientDetBackbone(**config.__dict__)
+        self.class_net = EfficientDetClassNet(
+            num_layers,
+            num_classes,
+            num_anchors,
+            feature_map_channel,
+            num_feature_maps,
+            use_seperable_conv,
+            path_dropout,
+        )
+        self.box_net = EfficientDetBoxNet(
+            num_layers,
+            num_anchors,
+            feature_map_channel,
+            num_feature_maps,
+            use_seperable_conv,
+            path_dropout,
+        )
+
+    def forward(self, x):
+        x = self.backbone(x)
+
+        return self.class_net(x), self.box_net(x)
 
 
 class EfficientDetForSemanticSegmentation(nn.Module):
     r"""
-
     """
     
     def __init__(
