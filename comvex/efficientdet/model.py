@@ -15,7 +15,7 @@ except:
 
 from comvex.utils import EfficientNetConfig, EfficientNetBackbone, BiFPN, SeperableConvXd
 from comvex.utils.helpers import get_norm_layer, get_act_fnc, get_attr_if_exists, config_pop_argument
-from .config import EfficientDetConfig
+from .config import EfficientDetObjectDetectionConfig
  
 
 _DEFAULT_ACT_FNC = "SiLU"
@@ -140,8 +140,8 @@ class EfficientDetBackbone(nn.Module):
         efficientnet_config: EfficientNetConfig,
         bifpn_num_layers: int,
         bifpn_channel: int,
-        shapes_in_stages: List[Tuple[int]],
         channels_in_stages: List[int],
+        shapes_in_stages: List[Tuple[int]],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
         use_bias: bool = False,
@@ -175,30 +175,35 @@ class EfficientDetBackbone(nn.Module):
         return feature_maps
 
 
-class EfficientDetForObjectDetection(nn.Module):
+class EfficientDetObjectDetection(nn.Module):
     r"""
     """
     
-    def __init__(self, config: EfficientDetConfig) -> None:
+    def __init__(self, config: EfficientDetObjectDetectionConfig) -> None:
+        num_pred_layers = config_pop_argument(config, "num_pred_layers")
+        num_classes = config_pop_argument(config, "num_classes")
+        num_anchors = config_pop_argument(config, "num_anchors")
+        use_seperable_conv = config_pop_argument(config, "use_seperable_conv")
+        path_dropout = config_pop_argument(config, "path_dropout")
         super().__init__()
 
-        self.backbone = EfficientDetBackbone(**config.__dict__)
+        self.backbone = EfficientDetBackbone(**config.efficientdet_config.__dict__)
         self.class_net = EfficientDetClassNet(
-            num_layers,
+            num_pred_layers,
             num_classes,
             num_anchors,
-            feature_map_channel,
-            num_feature_maps,
             use_seperable_conv,
             path_dropout,
+            feature_map_channel=config.efficientdet_backbone_config.bifpn_channel,
+            num_feature_maps=5,
         )
         self.box_net = EfficientDetBoxNet(
-            num_layers,
+            num_pred_layers,
             num_anchors,
-            feature_map_channel,
-            num_feature_maps,
             use_seperable_conv,
             path_dropout,
+            feature_map_channel=config.efficientdet_backbone_config.bifpn_channel,
+            num_feature_maps=5,
         )
 
     def forward(self, x):

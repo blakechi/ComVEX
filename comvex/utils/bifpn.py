@@ -36,8 +36,8 @@ class BiFPNConfig(ConfigBase):
         bifpn_channel: int,
         channels_in_stages: List[int],
         shapes_in_stages: Optional[List[Tuple[int]]] = None,
-        shape_scales: Optional[List[int]] = None,
         image_shape: Optional[Tuple[int]] = None,
+        shape_scales: List[int] = [8, 16, 32, 64, 128],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
         use_bias: bool = False,
@@ -49,20 +49,16 @@ class BiFPNConfig(ConfigBase):
         super().__init__()
 
         assert (
-            shapes_in_stages is not None or shape_scales is not None
-        ), name_with_msg("Either `shapes_in_shapes` or `shape_scales` should be specified")
+            shapes_in_stages is not None or image_shape is not None
+        ), name_with_msg("Either `shapes_in_shapes` or `image_shape` should be specified")
 
-        if shape_scales is not None:
-            assert (
-                image_shape is not None
-            ), name_with_msg("`image_shape` should be specified together with `shape_scales`")
-
+        if image_shape is not None:
             shapes_in_stages = [(image_shape[0] // scale, image_shape[1] // scale) for scale in shape_scales]
 
         self.num_layers = num_layers
         self.bifpn_channel = bifpn_channel
-        self.shapes_in_stages = shapes_in_stages 
         self.channels_in_stages = channels_in_stages
+        self.shapes_in_stages = shapes_in_stages 
         self.dimension = dimension
         self.upsample_mode = upsample_mode
         self.use_bias = use_bias
@@ -77,7 +73,6 @@ class BiFPNConfig(ConfigBase):
             num_layers,
             bifpn_channel,
             channels_in_stages,
-            shape_scales=[8, 16, 32, 64, 128],
             image_shape=image_shape
         )
         
@@ -315,8 +310,8 @@ class BiFPN(nn.Module):
         self,
         num_layers: int,
         bifpn_channel: int,
-        shapes_in_stages: List[Tuple[int]],
         channels_in_stages: List[int],
+        shapes_in_stages: List[Tuple[int]],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
         use_bias: bool = False,
