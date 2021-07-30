@@ -1,5 +1,4 @@
-from comvex.utils.helpers.functions import get_attr_if_exists
-from typing import Optional, Tuple, Dict
+from typing import Optional, Dict
 
 import torch
 from torch import nn
@@ -8,7 +7,7 @@ try:
 except:
     from torch.jit import Final
 
-from comvex.utils.helpers import name_with_msg, get_attr_if_exists
+from .helpers import name_with_msg, get_attr_if_exists
 
 
 class XXXConvXdBase(nn.Module):
@@ -42,9 +41,9 @@ class XXXConvXdBase(nn.Module):
         ), name_with_msg(self, "`dimension` must be larger than 0 and smaller than 4")
         
         self.dimension = dimension
-        component_orders = { **self.default_components, **extra_components}
+        component_orders = { **self.default_components, **extra_components }
         components = self._get_component(component_orders)
-        for attr_name, module in components:
+        for attr_name, module in components.items():
             setattr(self, attr_name, module)
         
     def _get_component(self, component_orders: Dict[str, str]) -> Dict[str, nn.Module]:
@@ -67,7 +66,7 @@ class SeperableConvXd(XXXConvXdBase):
         kernels_per_layer: int = 1, 
         dimension: int = 2,
         act_fnc_name: str = "ReLU",
-        extra_components: Dict[str, str] = {"norm", "BatchNorm"},
+        extra_components: Dict[str, str] = {"norm": "BatchNorm"},
         use_conv_only: bool = False,
         batch_norm_epsilon: float = 1e-5,
         batch_norm_momentum: float = 1e-1,

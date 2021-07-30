@@ -36,102 +36,102 @@ class EfficientNetBackboneConfig(ConfigBase):
 
     # Reference from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_builder.py#L39-L48
     @classmethod
-    def B0(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B0(cls, resolution: int = 224, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             1.0,
             1.0,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 224,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def B1(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B1(cls, resolution: int = 240, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             1.1,
             1.0,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 240,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def B2(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B2(cls, resolution: int = 260, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             1.2,
             1.1,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 260,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def B3(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B3(cls, resolution: int = 300, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             1.4,
             1.2,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 300,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def B4(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B4(cls, resolution: int = 380, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             1.8,
             1.4,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 380,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def B5(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B5(cls, resolution: int = 456, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             2.2,
             1.6,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 456,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def B6(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B6(cls, resolution: int = 528, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             2.6,
             1.8,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 528,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def B7(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B7(cls, resolution: int = 600, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             3.1,
             2.0,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 600,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def B8(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def B8(cls, resolution: int = 672, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             3.6,
             2.2,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 672,
+            resolution=resolution,
             **kwargs,
         )
         
     @classmethod
-    def L2(cls, **kwargs) -> "EfficientNetBackboneConfig":
+    def L2(cls, resolution: int = 800, **kwargs) -> "EfficientNetBackboneConfig":    
         return cls(
             3,
             5.3,
             4.3,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 800,
+            resolution=resolution,
             **kwargs,
         )
 
@@ -173,120 +173,120 @@ class EfficientNetConfig(ConfigBase):
 
     # Reference from: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_builder.py#L39-L48
     @classmethod
-    def EfficientNet_B0(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B0(cls, num_classes: int, resolution: int = 224, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             1.0,
             1.0,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 224,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.2,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_B1(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B1(cls, num_classes: int, resolution: int = 240, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             1.1,
             1.0,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 240,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.2,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_B2(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B2(cls, num_classes: int, resolution: int = 260, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             1.2,
             1.1,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 260,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.3,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_B3(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B3(cls, num_classes: int, resolution: int = 300, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             1.4,
             1.2,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 300,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.3,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_B4(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B4(cls, num_classes: int, resolution: int = 380, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             1.8,
             1.4,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 380,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.4,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_B5(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B5(cls, num_classes: int, resolution: int = 456, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             2.2,
             1.6,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 456,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.4,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_B6(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B6(cls, num_classes: int, resolution: int = 528, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             2.6,
             1.8,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 528,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.5,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_B7(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B7(cls, num_classes: int, resolution: int = 600, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             3.1,
             2.0,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 600,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.5,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_B8(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_B8(cls, num_classes: int, resolution: int = 672, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             3.6,
             2.2,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 672,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.5,
             **kwargs,
         )
         
     @classmethod
-    def EfficientNet_L2(cls, num_classes: int, **kwargs) -> "EfficientNetConfig":
+    def EfficientNet_L2(cls, num_classes: int, resolution: int = 800, **kwargs) -> "EfficientNetConfig":
         return cls(
             3,
             5.3,
             4.3,
-            resolution=kwargs["resolution"] if hasattr(kwargs, "resolution") else 800,
+            resolution=resolution,
             num_classes=num_classes,
             ff_dropout=0.5,
             **kwargs,
