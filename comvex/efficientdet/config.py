@@ -1,4 +1,4 @@
-from typing import Tuple, List, Literal
+from typing import Tuple, List, Literal, Optional
 
 from comvex.utils import ConfigBase, EfficientNetBackboneConfig, BiFPNConfig
 
@@ -7,125 +7,129 @@ class EfficientDetBackboneConfig(ConfigBase):
     def __init__(
         self,
         efficientnet_backbone_config: EfficientNetBackboneConfig,
+        image_shapes: Tuple[int],
         bifpn_num_layers: int,
         bifpn_channel: int,
-        image_shapes: List[Tuple[int]],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
-        use_bias: bool = False,
-        use_batch_norm: bool = False,
+        use_bias: bool = True,
+        use_conv_after_downsampling: bool = True,
         norm_mode: Literal["fast_norm", "softmax", "channel_fast_norm", "channel_softmax"] = "fast_norm",
         batch_norm_epsilon: float = 1e-5,
         batch_norm_momentum: float = 1e-1,
+        feature_map_indices: Optional[List[int]] = None
     ) -> None:
         super().__init__()
 
         self.efficientnet_backbone_config = efficientnet_backbone_config
+        self.image_shapes = image_shapes
 
         bifpn_config = BiFPNConfig(
             bifpn_num_layers=bifpn_num_layers,
             bifpn_channel=bifpn_channel,
-            channels_in_stages=[],
-            image_shapes=image_shapes,
+            channels_in_nodes=[],
+            shapes_in_nodes=[],
             dimension=dimension,
             upsample_mode=upsample_mode,
             use_bias=use_bias,
-            use_batch_norm=use_batch_norm,
+            use_conv_after_downsampling=use_conv_after_downsampling,
             norm_mode=norm_mode,
             batch_norm_epsilon=batch_norm_epsilon,
             batch_norm_momentum=batch_norm_momentum,
         )
         for name, value in bifpn_config.__dict__.items():
-            if name != "channels_in_stages":  # `channels_in_stages` will be handled automatically in `EfficientDetBackbone`
+            if not name in ["channels_in_nodes", "shapes_in_nodes"]:  # These will be handled automatically in `EfficientDetBackbone`
                 setattr(self, name, value)
+                
+        self.feature_map_indices = feature_map_indices
 
     @classmethod
     def D0(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B0(resolution=512),
+            EfficientNetBackboneConfig.B0(resolution=512, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (512, 512),
             3,
             64,
-            image_shapes=(512, 512),
             **kwargs
         )
         
     @classmethod
     def D1(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B1(resolution=640),
+            EfficientNetBackboneConfig.B1(resolution=640, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (640, 640),
             4,
             88,
-            image_shapes=(640, 640),
             **kwargs
         )
 
     @classmethod
     def D2(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B2(resolution=768),
+            EfficientNetBackboneConfig.B2(resolution=768, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (768, 768),
             5,
             112,
-            image_shapes=(768, 768),
             **kwargs
         )
 
     @classmethod
     def D3(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B3(resolution=896),
+            EfficientNetBackboneConfig.B3(resolution=896, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (896, 896),
             6,
             120,
-            image_shapes=(896, 896),
             **kwargs
         )
 
     @classmethod
     def D4(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B4(resolution=1024),
+            EfficientNetBackboneConfig.B4(resolution=1024, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (1024, 1024),
             7,
             224,
-            image_shapes=(1024, 1024),
             **kwargs
         )
 
     @classmethod
     def D5(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B5(resolution=1280),
+            EfficientNetBackboneConfig.B5(resolution=1280, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (1280, 1280),
             7,
             288,
-            image_shapes=(1280, 1280),
             **kwargs
         )
 
     @classmethod
     def D6(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B6(resolution=1280),
+            EfficientNetBackboneConfig.B6(resolution=1280, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (1280, 1280),
             8,
             384,
-            image_shapes=(1280, 1280),
             **kwargs
         )
 
     @classmethod
     def D7(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B6(resolution=1536),
+            EfficientNetBackboneConfig.B6(resolution=1536, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (1536, 1536),
             8,
             384,
-            image_shapes=(1536, 1536),
             **kwargs
         )
 
     @classmethod
     def D7x(cls, **kwargs) -> "EfficientDetBackboneConfig":
         return cls(
-            EfficientNetBackboneConfig.B7(resolution=1536),
+            EfficientNetBackboneConfig.B7(resolution=1536, strides=[1, *([2]*7), 1]),  # EfficientDet uses stride=2 from stage 2 to 8
+            (1536, 1536),
             8,
             384,
-            image_shapes=(1536, 1536),
             **kwargs
         )
 

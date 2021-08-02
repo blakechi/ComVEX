@@ -16,15 +16,19 @@ from .helpers import get_conv_layer
 
 
 @torch.jit.script
-def bifpn_fast_norm(x, weights, dim: int = 0):
+def bifpn_fast_norm(x_list: List[torch.Tensor], weights: torch.Tensor, dim: int = 0):
+    x = torch.stack(x_list, dim=0)
+
     weights = F.relu(weights)
     norm = weights.sum(dim=dim, keepdim=True)
 
-    return x*weights / (norm + 1e-4)
+    return (x*weights / (norm + 1e-8)).sum(dim=0)
 
 
 @torch.jit.script
-def bifpn_softmax(x, weights, dim: int = 0):
+def bifpn_softmax(x_list: List[torch.Tensor], weights: torch.Tensor, dim: int = 0):
+    x = torch.stack(x_list, dim=0)
+
     weights = F.softmax(weights, dim)
 
     return (x*weights).sum(dim=0)
@@ -35,47 +39,29 @@ class BiFPNConfig(ConfigBase):
         self,
         bifpn_num_layers: int,
         bifpn_channel: int,
-        channels_in_stages: List[int],
-        shapes_in_stages: Optional[List[Tuple[int]]] = None,
-        image_shapes: Optional[Tuple[int]] = None,
-        shape_scales: List[int] = [8, 16, 32, 64, 128],
+        channels_in_nodes: List[int],
+        shapes_in_nodes: List[Tuple[int]],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
-        use_bias: bool = False,
-        use_batch_norm: bool = False,
+        use_bias: bool = True,
+        use_conv_after_downsampling: bool = True,
         norm_mode: Literal["fast_norm", "softmax", "channel_fast_norm", "channel_softmax"] = "fast_norm",
         batch_norm_epsilon: float = 1e-5,
         batch_norm_momentum: float = 1e-1,
     ) -> None:
         super().__init__()
 
-        assert (
-            shapes_in_stages is not None or image_shapes is not None
-        ), name_with_msg("Either `shapes_in_shapes` or `image_shapes` should be specified")
-
-        if image_shapes is not None:
-            shapes_in_stages = [(image_shapes[0] // scale, image_shapes[1] // scale) for scale in shape_scales]
-
         self.bifpn_num_layers = bifpn_num_layers
         self.bifpn_channel = bifpn_channel
-        self.channels_in_stages = channels_in_stages
-        self.shapes_in_stages = shapes_in_stages 
+        self.channels_in_nodes = channels_in_nodes
+        self.shapes_in_nodes = shapes_in_nodes 
         self.dimension = dimension
         self.upsample_mode = upsample_mode
         self.use_bias = use_bias
-        self.use_batch_norm = use_batch_norm
+        self.use_conv_after_downsampling = use_conv_after_downsampling
         self.norm_mode = norm_mode
         self.batch_norm_epsilon = batch_norm_epsilon
         self.batch_norm_momentum = batch_norm_momentum
-
-    @classmethod
-    def BiFPN_Default(cls, bifpn_num_layers: int, bifpn_channel: int, channels_in_stages: List[int], image_shapes: Tuple[int], **kwargs) -> "BiFPNConfig":
-        return cls(
-            bifpn_num_layers,
-            bifpn_channel,
-            channels_in_stages,
-            image_shapes=image_shapes
-        )
         
 
 class BiFPNResizeXd(XXXConvXdBase):
@@ -93,8 +79,8 @@ class BiFPNResizeXd(XXXConvXdBase):
         out_shape: Tuple[int],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
+        use_bias: bool = True,
         use_conv_after_downsampling: bool = True,
-        use_bias: bool = False,
         batch_norm_epsilon: float = 1e-5,
         batch_norm_momentum: float = 1e-1,
     ) -> None:
@@ -107,32 +93,39 @@ class BiFPNResizeXd(XXXConvXdBase):
             (in_shape[0] > out_shape[0]) == (in_shape[1] > out_shape[1])
         ), name_with_msg(f"`Elements in `in_shape` must be all larger or small than `out_shape`. But got: `in_shape` = {in_shape} and `out_shape` = {out_shape}")
 
+        self.use_conv = True if in_channel != out_channel else False
+        self.use_conv_after_downsampling = use_conv_after_downsampling
         extra_components = { "max_pool": "AdaptiveMaxPool" } 
-        extra_components = { **extra_components, "batch_norm": "BatchNorm" } if use_conv_after_downsampling else extra_components
+        extra_components = { **extra_components, "batch_norm": "BatchNorm" } if self.use_conv or self.use_conv_after_downsampling else extra_components
         super().__init__(in_channel, out_channel, dimension, extra_components=extra_components)
         
+        self.proj_channel = nn.Identity()
+        self.norm = nn.Identity()
+        if self.use_conv or self.use_conv_after_downsampling:
+            self.proj_channel = self.conv(self.in_channel, self.out_channel, kernel_size=1, bias=use_bias)
+            self.norm = self.batch_norm(
+                self.out_channel,
+                eps=batch_norm_epsilon,
+                momentum=batch_norm_momentum,
+            )
+
         if in_shape[0] > out_shape[0]:  # downsampling
-            self.interpolate_shape = self.max_pool(out_shape)
             self.downsampling = True
-            self.use_conv_after_downsampling = use_conv_after_downsampling
-            if self.use_conv_after_downsampling:
-                self.proj_channel = self.conv(in_channel, out_channel, kernel_size=1, use_bias=use_bias)
-                self.norm = self.batch_norm(
-                    out_channel,
-                    eps=batch_norm_epsilon,
-                    momentum=batch_norm_momentum,
-                )
+            self.interpolate_shape = self.max_pool(out_shape)
         else:  # upsampling
             self.downsampling = False
-            self.interpolate_shape = nn.Upsample(out_shape, mode=upsample_mode, align_corners=True)
+            self.interpolate_shape = nn.Upsample(out_shape, mode=upsample_mode)
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.interpolate_shape(x)
-
-        if self.downsampling and self.use_conv_after_downsampling:
+        if self.downsampling:
+            x = self.interpolate_shape(x)
+            x = self.proj_channel(x)
+            x= self.norm(x)
+        else:
             x = self.proj_channel(x)
             x = self.norm(x)
+            x = self.interpolate_shape(x)
 
         return x
 
@@ -145,13 +138,14 @@ class BiFPNNodeBase(nn.Module):
         self,
         num_inputs: int,
         in_channel: int,
+        diff_in_channel: int,
         out_channel: int,
         in_shape: Tuple[int],
         out_shape: Tuple[int],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
-        use_bias: bool = False,
-        use_batch_norm: bool = False,
+        use_bias: bool = True,
+        use_conv_after_downsampling: bool = True,
         norm_mode: Literal["fast_norm", "softmax", "channel_fast_norm", "channel_softmax"] = "fast_norm",
         **possible_batch_norm_kwargs
     ) -> None:
@@ -164,23 +158,29 @@ class BiFPNNodeBase(nn.Module):
             kernel_size=1,
         ) if in_channel != out_channel else nn.Identity()
 
-        self.resize = BiFPNResizeXd(
-            in_channel,
+        self.resize = torch.jit.script(BiFPNResizeXd(
+            diff_in_channel,
             out_channel,
             in_shape,
             out_shape,
             dimension,
             upsample_mode,
             use_bias,
-            use_batch_norm,
+            use_conv_after_downsampling,
             **possible_batch_norm_kwargs
-        )
-        self.conv = SeperableConvXd(
-            in_channel,
+        ))
+        
+        self.fuse_conv = SeperableConvXd(
+            out_channel,
             out_channel,
             dimension=dimension,
             **possible_batch_norm_kwargs
         )
+
+        if norm_mode.startswith("channel"):
+            self.weights = nn.Parameter(torch.ones(num_inputs, 1, out_channel, *([1]*len(in_shape))))  # Ex: (2, 1, C, 1, 1) for images with shape: (B, C, H, W)
+        else:
+            self.weights = nn.Parameter(torch.ones(num_inputs, 1, 1, 1, 1))
 
         if norm_mode.endswith("fast_norm"):
             self.fuse_features = bifpn_fast_norm
@@ -188,11 +188,6 @@ class BiFPNNodeBase(nn.Module):
             self.fuse_features = bifpn_softmax
         else:
             raise ValueError(name_with_msg(f"Unknown `norm_mode`. Got: `norm_mode` = {norm_mode}"))
-
-        if norm_mode.startswith("channel"):
-            self.weights = nn.Parameter(torch.ones(num_inputs, 1, out_channel, *([1]*len(in_shape))))  # Ex: (2, 1, C, 1, 1) for images with shape: (B, C, H, W)
-        else:
-            self.weights = nn.Parameter(torch.ones(num_inputs))
 
 
 class BiFPNIntermediateNode(BiFPNNodeBase):
@@ -205,9 +200,8 @@ class BiFPNIntermediateNode(BiFPNNodeBase):
     def forward(self, x: torch.Tensor, x_diff: torch.Tensor) -> torch.Tensor:
         x = self.proj_feature_channel(x)
         x_diff = self.resize(x_diff)
-        x_stack = torch.stack([x, x_diff], dim=0)
 
-        return self.conv(self.fuse_features(x_stack, self.weights))
+        return self.fuse_conv(self.fuse_features([x, x_diff], self.weights))
 
 
 BiFPNOutputEndPoint = BiFPNIntermediateNode  #The start and end nodes in the outputs
@@ -216,16 +210,37 @@ BiFPNOutputEndPoint = BiFPNIntermediateNode  #The start and end nodes in the out
 class BiFPNOutputNode(BiFPNNodeBase):
     def __init__(
         self,
-        **kwargs,
+        in_channel: int,
+        out_channel: int,
+        in_shape: Tuple[int],
+        out_shape: Tuple[int],
+        dimension: int = 2,
+        upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
+        use_bias: bool = True,
+        use_conv_after_downsampling: bool = True,
+        norm_mode: Literal["fast_norm", "softmax", "channel_fast_norm", "channel_softmax"] = "fast_norm",
+        **possible_batch_norm_kwargs
     ) -> None:
-        super().__init__(num_inputs=3, **kwargs)
+        super().__init__(
+            num_inputs=3,
+            in_channel=in_channel,
+            diff_in_channel=out_channel,
+            out_channel=out_channel,
+            in_shape=in_shape,
+            out_shape=out_shape,
+            dimension=dimension,
+            upsample_mode=upsample_mode,
+            use_bias=use_bias,
+            use_conv_after_downsampling=use_conv_after_downsampling,
+            norm_mode=norm_mode,
+            **possible_batch_norm_kwargs
+        )
 
     def forward(self, x: torch.Tensor, x_hidden: torch.Tensor, x_diff: torch.Tensor) -> torch.Tensor:
         x = self.proj_feature_channel(x)
         x_diff = self.resize(x_diff)
-        x_stack = torch.stack([x, x_hidden, x_diff], dim=0)
 
-        return self.conv(self.fuse_features(x_stack, self.weights))
+        return self.fuse_conv(self.fuse_features([x, x_hidden, x_diff], self.weights))
 
 
 class BiFPNLayer(nn.Module):
@@ -238,35 +253,37 @@ class BiFPNLayer(nn.Module):
     def __init__(
         self,
         bifpn_channel: int,
-        shapes_in_stages: List[Tuple[int]],
-        channels_in_stages: Optional[List[int]] = None,
-        **possible_batch_norm_kwargs,
+        shapes_in_nodes: List[Tuple[int]],
+        channels_in_nodes: Optional[List[int]] = None,
+        **kwargs,
     ) -> None:
         super().__init__()
-        self.num_nodes = len(shapes_in_stages)
+        self.num_nodes = len(shapes_in_nodes)
 
         self.intermediate_nodes = nn.ModuleList([
             BiFPNIntermediateNode(
-                in_channel=channels_in_stages[idx + 1] if channels_in_stages is not None else bifpn_channel,  # Channel of the feature map comes from deeper layers.
+                in_channel=channels_in_nodes[idx] if channels_in_nodes is not None else bifpn_channel,  # Channel of the feature map comes from deeper layers.
+                diff_in_channel=channels_in_nodes[idx + 1] if channels_in_nodes is not None and idx == (self.num_nodes - 2) else bifpn_channel,  # The last `diff_channel` comes from P7
                 out_channel=bifpn_channel,
-                in_shape=shapes_in_stages[idx + 1],
-                out_shape=shapes_in_stages[idx],
-                **possible_batch_norm_kwargs
+                in_shape=shapes_in_nodes[idx + 1],
+                out_shape=shapes_in_nodes[idx],
+                **kwargs
             ) for idx in range(1, self.num_nodes - 1)
         ])
         self.output_nodes = nn.ModuleList([
             BiFPNOutputEndPoint(
-                in_channel=bifpn_channel,
+                in_channel=channels_in_nodes[idx] if channels_in_nodes is not None else bifpn_channel,
+                diff_in_channel=bifpn_channel,
                 out_channel=bifpn_channel,
-                in_shape=shapes_in_stages[idx + 1] if idx ==0 else shapes_in_stages[idx - 1],
-                out_shape=shapes_in_stages[idx],
-                **possible_batch_norm_kwargs
-            ) if idx == 0 or idx == self.num_nodes else BiFPNOutputNode(
-                in_channel=bifpn_channel,
+                in_shape=shapes_in_nodes[idx + 1] if idx == 0 else shapes_in_nodes[idx - 1],
+                out_shape=shapes_in_nodes[idx],
+                **kwargs
+            ) if idx == 0 or idx == (self.num_nodes - 1) else BiFPNOutputNode(
+                in_channel=channels_in_nodes[idx] if channels_in_nodes is not None else bifpn_channel,
                 out_channel=bifpn_channel,
-                in_shape=shapes_in_stages[idx - 1],
-                out_shape=shapes_in_stages[idx],
-                **possible_batch_norm_kwargs
+                in_shape=shapes_in_nodes[idx - 1],
+                out_shape=shapes_in_nodes[idx],
+                **kwargs
             ) for idx in range(self.num_nodes)
         ])
 
@@ -276,19 +293,18 @@ class BiFPNLayer(nn.Module):
         x_diff = feature_list[-1]  # It will be propagated to every nodes
 
         # Intermediate Nodes
-        for rev_idx, node in reversed(enumerate(self.intermediate_nodes)):
-            x = feature_list[rev_idx + 1]  # plus 1 because intermediate nodes don't include shallowest and deepest features
-            x_diff = node(x, x_diff)
+        for node, feature in zip(reversed(self.intermediate_nodes), reversed(feature_list[1: -1])):
+            x_diff = node(feature, x_diff)
             hidden_feature_list.append(x_diff)
 
         # Output Nodes
-        for idx, node in enumerate(self.output_nodes):
-            x = feature_list[idx]
-            if idx == 0 or idx == self.num_nodes:
-                x_diff = node(x, x_diff)
+        for idx, (node, feature) in enumerate(zip(self.output_nodes, feature_list)):
+            if idx == 0 or idx == (self.num_nodes - 1):
+                x_diff = node(feature, x_diff)
             else:
-                x_hidden = hidden_feature_list[-(idx + 1)]  # select reversely
-                x_diff = node(x, x_hidden, x_diff)
+                print(len(hidden_feature_list), -idx, feature.shape, hidden_feature_list[-idx].shape, x_diff.shape)
+                x_hidden = hidden_feature_list[-idx]  # select reversely
+                x_diff = node(feature, x_hidden, x_diff)
 
             out_feature_list.append(x_diff)
 
@@ -304,12 +320,12 @@ class BiFPN(nn.Module):
         self,
         bifpn_num_layers: int,
         bifpn_channel: int,
-        channels_in_stages: List[int],
-        shapes_in_stages: List[Tuple[int]],
+        channels_in_nodes: List[int],
+        shapes_in_nodes: List[Tuple[int]],
         dimension: int = 2,
         upsample_mode: Literal["nearest", "linear", "bilinear", "bicubic", "trilinear"] = "nearest",
-        use_bias: bool = False,
-        use_batch_norm: bool = False,
+        use_bias: bool = True,
+        use_conv_after_downsampling: bool = True,
         norm_mode: Literal["fast_norm", "softmax", "channel_fast_norm", "channel_softmax"] = "fast_norm",
         batch_norm_epsilon: float = 1e-5,
         batch_norm_momentum: float = 1e-1
@@ -317,18 +333,19 @@ class BiFPN(nn.Module):
         super().__init__()
 
         assert (
-            len(shapes_in_stages) == len(channels_in_stages)
-        ), name_with_msg(f"The length of `shapes_in_stages` and `channels_in_stages` must be equal. But got: {len(shapes_in_stages)} for shapes and {len(channels_in_stages)} for channels.")
-
+            len(shapes_in_nodes) == len(channels_in_nodes)
+        ), name_with_msg(f"The length of `shapes_in_nodes` and `channels_in_nodes` must be equal. But got: {len(shapes_in_nodes)} for shapes and {len(channels_in_nodes)} for channels.")
+        print(channels_in_nodes)
+        print(shapes_in_nodes)
         self.layers = nn.ModuleList([
             BiFPNLayer(
                 bifpn_channel,
-                shapes_in_stages,
-                channels_in_stages if idx == 0 else None,
+                shapes_in_nodes,
+                channels_in_nodes if idx == 0 else None,
                 dimension=dimension,
                 upsample_mode=upsample_mode,
                 use_bias=use_bias,
-                use_batch_norm=use_batch_norm,
+                use_conv_after_downsampling=use_conv_after_downsampling,
                 norm_mode=norm_mode,
                 batch_norm_epsilon=batch_norm_epsilon,
                 batch_norm_momentum=batch_norm_momentum
@@ -336,6 +353,9 @@ class BiFPN(nn.Module):
         ])
 
     def forward(self, feature_list: List[torch.Tensor]) -> List[torch.Tensor]:
+        for f in feature_list:
+            print(f.shape)
+            
         for layer in self.layers:
             feature_list = layer(feature_list)
 

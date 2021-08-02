@@ -21,7 +21,7 @@ class XXXConvXdBase(nn.Module):
     in_channel: Final[int]
     out_channel: Final[int]
     dimension: Final[int]
-    default_components: Final[Dict[str, str]] = { "conv": "Conv" }
+    default_components: Dict[str, str] = { "conv": "Conv" }
 
     def __init__(
         self,
@@ -99,7 +99,7 @@ class SeperableConvXd(XXXConvXdBase):
         x = self.depth_wise_conv(x)
         x = self.pixel_wise_conv(x)
         
-        if self.use_conv_only:
+        if not self.use_conv_only:
             x = self.norm_layer(x)
             x = self.act_fnc(x)
         
