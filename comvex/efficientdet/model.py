@@ -1,4 +1,5 @@
-from functools import partial, reduce
+from comvex.utils.helpers.functions import name_with_msg
+from functools import partial
 from collections import OrderedDict
 from itertools import accumulate
 from typing import Literal, List, Tuple, Optional
@@ -23,7 +24,7 @@ class EfficientDetBackbone(nn.Module):
     `EfficientNetBackbone` + `BiFPN`
     """
 
-    _DEFAULT_FEATURE_MAP_SCALE = [8, 16, 32, 64, 128]  # Official paper: Figure. 3 - EfficientNet Backbone
+    _DEFAULT_FEATURE_MAP_SCALE: Final[List[int]] = [8, 16, 32, 64, 128]  # Official paper: Figure. 3 - EfficientNet Backbone
     
     def __init__(
         self,
@@ -51,13 +52,18 @@ class EfficientDetBackbone(nn.Module):
         channels_in_stages = self.efficentnet_backbone.channels
         strides_in_stages = self.efficentnet_backbone.strides
         scale_in_stages = list(accumulate(strides_in_stages, lambda x, y: x*y))
+        shapes_in_stages = [(image_shapes[0] // scale, image_shapes[1] // scale) for scale in scale_in_stages]
+
+        num_stages = len(channels_in_stages)
         unique_scale_with_idx = {}
         for idx, scale in enumerate(scale_in_stages):
             unique_scale_with_idx[scale] = idx
+
         unique_scale_with_idx = list(unique_scale_with_idx.items())
-        
-        shapes_in_stages = [(image_shapes[0] // scale, image_shapes[1] // scale) for scale in scale_in_stages]
         feature_map_indices = feature_map_indices or [idx for scale, idx in unique_scale_with_idx if scale in self._DEFAULT_FEATURE_MAP_SCALE]
+        assert (
+            max(feature_map_indices) < num_stages
+        ), name_with_msg(f"Indices in `feature_map_indices` ({feature_map_indices}) are larger than the number of existing feature maps.")
 
         self.feature_map_keys = [f"stage_{idx + 1}" for idx in feature_map_indices]
         channels_in_nodes = [channels_in_stages[idx] for idx in feature_map_indices]
@@ -209,7 +215,7 @@ class EfficientDetObjectDetection(nn.Module):
 
         self.backbone = EfficientDetBackbone(**config.efficientdet_backbone_config.__dict__)
 
-        num_feature_maps = 5 or len(config.efficientdet_backbone_config.feature_map_indices)
+        num_feature_maps = 5 or len(config.efficientdet_backbone_config.feature_map_indices)  # 5 is the default
         self.class_net = EfficientDetClassNet(
             num_layers=num_pred_layers,
             num_classes=num_classes,

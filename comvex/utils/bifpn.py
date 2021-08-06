@@ -302,7 +302,6 @@ class BiFPNLayer(nn.Module):
             if idx == 0 or idx == (self.num_nodes - 1):
                 x_diff = node(feature, x_diff)
             else:
-                print(len(hidden_feature_list), -idx, feature.shape, hidden_feature_list[-idx].shape, x_diff.shape)
                 x_hidden = hidden_feature_list[-idx]  # select reversely
                 x_diff = node(feature, x_hidden, x_diff)
 
@@ -335,8 +334,7 @@ class BiFPN(nn.Module):
         assert (
             len(shapes_in_nodes) == len(channels_in_nodes)
         ), name_with_msg(f"The length of `shapes_in_nodes` and `channels_in_nodes` must be equal. But got: {len(shapes_in_nodes)} for shapes and {len(channels_in_nodes)} for channels.")
-        print(channels_in_nodes)
-        print(shapes_in_nodes)
+
         self.layers = nn.ModuleList([
             BiFPNLayer(
                 bifpn_channel,
@@ -353,9 +351,6 @@ class BiFPN(nn.Module):
         ])
 
     def forward(self, feature_list: List[torch.Tensor]) -> List[torch.Tensor]:
-        for f in feature_list:
-            print(f.shape)
-            
         for layer in self.layers:
             feature_list = layer(feature_list)
 
