@@ -16,7 +16,7 @@ def config_pop_argument(config: ConfigBase = ConfigBase(), argument: str = "") -
     try:
         return config.__dict__.pop(argument)
     except:
-        if len(config) == 0:
+        if hasattr(config, "__len__") and len(config) == 0:
             raise ValueError("Please specify a non-empty configuration")
         elif argument == "":
             raise KeyError("Please specify a `argument`")

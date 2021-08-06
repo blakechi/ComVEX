@@ -95,58 +95,6 @@ class EfficientNetBase(nn.Module):
         return new_filters
 
 
-class SeperateConvXd(XXXConvXdBase):
-    r"""
-    Reference from: MnasNet (https://arxiv.org/pdf/1807.11626.pdf)
-    """
-
-    def __init__(
-        self, 
-        in_channel: int, 
-        out_channel: int, 
-        kernel_size: int = 3, 
-        padding: int = 1, 
-        kernels_per_layer: int = 1, 
-        norm_layer_name: str = "BatchNorm2d",
-        act_fnc_name: str = "ReLU",
-        dimension: int = 2,
-        **kwargs  # For the normalization layer
-    ) -> None:
-        super().__init__(in_channel, out_channel, dimension=dimension)
-
-        self.depth_wise_conv = nn.Sequential(
-            self.conv(
-                self.in_channel, 
-                self.in_channel*kernels_per_layer, 
-                kernel_size, 
-                padding=padding, 
-                groups=self.in_channel
-            ),
-            get_attr_if_exists(nn, norm_layer_name)(
-                self.in_channel*kernels_per_layer,
-                **kwargs
-            ),
-            get_attr_if_exists(nn, act_fnc_name)()
-        )
-        self.pixel_wise_conv = nn.Sequential(
-            self.conv(
-                self.in_channel*kernels_per_layer,
-                out_channel,
-                kernel_size=1,
-            ),
-            get_attr_if_exists(nn, norm_layer_name)(
-                self.in_channel*kernels_per_layer,
-                **kwargs
-            )
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.depth_wise_conv(x)
-        x = self.pixel_wise_conv(x)
-
-        return x
-
-
 class SEConvXd(XXXConvXdBase):
     r"""
     Squeeze-and-Excitation Convolution 
@@ -158,18 +106,20 @@ class SEConvXd(XXXConvXdBase):
         in_channel: int,
         bottleneck_channel: int,
         out_channel: Optional[int] = None,
-        se_act_fnc_name: Optional[str] = None,
+        se_act_fnc_name: str = "ReLU",
         dimension: int = 2,
+        pool_name_without_dim: Literal["AdaptiveMaxPool", "AdaptiveAvgPool"] = "AdaptiveMaxPool",
     ) -> None:
-        super().__init__(in_channel, out_channel, dimension=dimension)
+        extra_components = { "pool": pool_name_without_dim}
+        super().__init__(in_channel, out_channel, dimension=dimension, extra_components=extra_components)
 
-        self.layers = nn.Sequential(
-            nn.AdaptiveMaxPool2d((1, 1)),
-            self.conv(self.in_channel, bottleneck_channel, 1),
-            get_attr_if_exists(nn, se_act_fnc_name)(),
-            self.conv(bottleneck_channel, self.out_channel, 1),
-            nn.Sigmoid(),
-        )
+        self.layers = nn.Sequential(OrderedDict([
+            ("squeeze", self.pool((1, 1))),
+            ("excitation_conv_0", self.conv(self.in_channel, bottleneck_channel, 1)),
+            ("excitation_act_fnc_0", get_attr_if_exists(nn, se_act_fnc_name)()),
+            ("excitation_conv_1", self.conv(bottleneck_channel, self.out_channel, 1)),
+            ("excitation_act_fnc_1", nn.Sigmoid()),
+        ]))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x*self.layers(x)        
@@ -343,10 +293,16 @@ class EfficientNetBackbone(EfficientNetBase):
         depth_scale: float,
         width_scale: float,
         resolution: int,
-        up_sampling_mode: Optional[str] = None,
-        act_fnc_name: str = "SiLU",
+        num_layers: Optional[List[int]] = None,
+        channels: Optional[List[int]] = None,
+        kernel_sizes: Optional[List[int]] = None,
+        strides: Optional[List[int]] = None,
+        expand_scales: Optional[List[Optional[int]]] = None,
+        se_scales: Optional[List[Optional[int]]] = None,
+        se_scale: Optional[float] = 0.25,
         se_act_fnc_name: str = "SiLU",
-        se_scale: float = 0.25,
+        act_fnc_name: str = "SiLU",
+        up_sampling_mode: Optional[str] = None,
         # From: https://github.com/tensorflow/tpu/blob/3679ca6b979349dde6da7156be2528428b000c7c/models/official/efficientnet/efficientnet_builder.py#L187-L188
         batch_norm_eps: float = 1e-3,
         batch_norm_momentum: float = 0.99,
@@ -359,6 +315,12 @@ class EfficientNetBackbone(EfficientNetBase):
             depth_scale,
             width_scale,
             resolution,
+            num_layers=num_layers,
+            channels=channels,
+            kernel_sizes=kernel_sizes,
+            strides=strides,
+            expand_scales=expand_scales,
+            se_scales=se_scales,
             se_scale=se_scale,
             up_sampling_mode=up_sampling_mode,
             return_feature_maps=return_feature_maps,
@@ -371,29 +333,30 @@ class EfficientNetBackbone(EfficientNetBase):
         kwargs["act_fnc_name"] = act_fnc_name
         kwargs["se_act_fnc_name"] = se_act_fnc_name
         
-        self.stage_1 = self._build_stage("1", **kwargs,
+        self.stages = nn.ModuleList()
+        self.stages.append(self._build_stage("1", **kwargs,
             in_channel=image_channel,
             out_channel=self.channels[0],
             kernel_size=self.kernel_sizes[0]
-        )
-        self.stage_2 = self._build_stage("2", **kwargs)
-        self.stage_3 = self._build_stage("3", **kwargs)
-        self.stage_4 = self._build_stage("4", **kwargs)
-        self.stage_5 = self._build_stage("5", **kwargs)
-        self.stage_6 = self._build_stage("6", **kwargs)
-        self.stage_7 = self._build_stage("7", **kwargs)
-        self.stage_8 = self._build_stage("8", **kwargs)
-        self.stage_9 = self._build_stage("9", **kwargs,
+        ))
+        self.stages.append(self._build_stage("2", **kwargs))
+        self.stages.append(self._build_stage("3", **kwargs))
+        self.stages.append(self._build_stage("4", **kwargs))
+        self.stages.append(self._build_stage("5", **kwargs))
+        self.stages.append(self._build_stage("6", **kwargs))
+        self.stages.append(self._build_stage("7", **kwargs))
+        self.stages.append(self._build_stage("8", **kwargs))
+        self.stages.append(self._build_stage("9", **kwargs,
             in_channel=self.channels[-2],
             out_channel=self.channels[-1],
             kernel_size=self.kernel_sizes[-1]
-        )
+        ))
 
     def forward(self, x: torch.Tensor) -> Union[
         Dict[str, torch.Tensor],
         torch.Tensor
     ]:
-        # These `if` statements should be removed after scripting, so don't worry
+        # `if` statements would be removed after scripting, so don't worry
         if self.up_sampling_mode:
             x = nn.functional.interpolate(
                 x,
@@ -404,29 +367,11 @@ class EfficientNetBackbone(EfficientNetBase):
         if self.return_feature_maps:
             feature_maps: Dict[str, torch.Tensor] = {}
 
-        x = self.stage_1(x)
-        x = self.stage_2(x)
-        x = self.stage_3(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_1'] = x
+        for idx, stage in enumerate(self.stages):
+            x = stage(x)
 
-        x = self.stage_4(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_2'] = x
-
-        x = self.stage_5(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_3'] = x
-
-        x = self.stage_6(x)
-        x = self.stage_7(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_4'] = x
-
-        x = self.stage_8(x)
-        x = self.stage_9(x)
-        if self.return_feature_maps:
-            feature_maps['reduction_5'] = x
+            if self.return_feature_maps:
+                feature_maps[f'stage_{idx + 1}'] = x
             
         return feature_maps if self.return_feature_maps else x
 
@@ -506,7 +451,7 @@ class EfficientNetWithLinearClassifier(EfficientNetBackbone):
 
         if self.return_feature_maps:
             feature_maps: Dict[str, torch.Tensor] = super().forward(x)
-            x: torch.Tensor = feature_maps['reduction_5']
+            x: torch.Tensor = feature_maps['stage_9']
         else:
             x: torch.Tensor = super().forward(x)
 
