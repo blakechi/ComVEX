@@ -1,7 +1,6 @@
-from comvex.utils.helpers.functions import name_with_msg
 from typing import Optional, Literal
 
-from utils import ConfigBase
+from comvex.utils import ConfigBase
 
 
 class AFTConfig(ConfigBase):
@@ -12,8 +11,8 @@ class AFTConfig(ConfigBase):
         patch_size: int,
         num_layers: int,
         dim: int,
-        local_window_size: int,
         num_classes: int,
+        local_window_size: Optional[int] = 0,
         hidden_dim: Optional[int] = None,
         aft_mode: Literal["full", "simple", "local", "conv", "general"] = "full",
         pool_mode: Literal["mean", "class"] = "mean",
@@ -75,6 +74,7 @@ class AFTConfig(ConfigBase):
             aft_mode="full",
             pool_mode="mean",
             position_bias_dim=128,
+            local_window_size=None,
             num_classes=num_classes,
             **kwargs
         )
@@ -90,6 +90,7 @@ class AFTConfig(ConfigBase):
             aft_mode="full",
             pool_mode="mean",
             position_bias_dim=128,
+            local_window_size=None,
             num_classes=num_classes,
             **kwargs
         )

@@ -50,9 +50,9 @@ class AFTGeneral(nn.Module):
         if local_window_size is not None:
             assert (
                 (0 < local_window_size) and (local_window_size <= max_seq_len)
-            ), name_with_msg(f"`local_window_size` should be in the interval (0, `max_seq_len`]: (0, {max_seq_len}]. But got: {local_window_size}.")
+            ), name_with_msg(self, f"`local_window_size` should be in the interval (0, `max_seq_len`]: (0, {max_seq_len}]. But got: {local_window_size}.")
 
-        use_local = True if local_window_size is None or local_window_size == max_seq_len else False
+        use_local = True if local_window_size is not None else False
         self.use_position_bias = use_position_bias
 
         self.Q = nn.Linear(dim, hidden_dim, bias=use_bias)
@@ -64,7 +64,7 @@ class AFTGeneral(nn.Module):
             self.u = nn.Parameter(torch.rand(max_seq_len, position_bias_dim), requires_grad=True)
             self.v = nn.Parameter(torch.rand(max_seq_len, position_bias_dim), requires_grad=True)
         
-        self.query_act_fnc = get_act_fnc(query_act_fnc)
+        self.query_act_fnc = get_act_fnc(query_act_fnc)()
         self.attention_dropout = nn.Dropout(attention_dropout)
         self.out_dropout = nn.Dropout(ff_dropout)
 
@@ -73,7 +73,7 @@ class AFTGeneral(nn.Module):
         self._init_weights()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        _, n, _ = x
+        _, n, _ = x.shape
 
         # project
         q, k, v = self.Q(x), self.K(x), self.V(x)
@@ -148,9 +148,10 @@ class AFTDepthWiseConv2DOperator(nn.Module):
 
     def forward(self, x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
         dim = x.shape[-3]
+        padding = weight.shape[-1] // 2
 
         weight = weight.unsqueeze(dim=0).expand(dim, -1, -1, -1)
-        x = nn.functional.conv2d(x, weight, groups=dim)
+        x = nn.functional.conv2d(x, weight, padding=padding, groups=dim)
 
         return x
 
@@ -178,11 +179,12 @@ class AFTConv(nn.Module):
         hidden_dim = hidden_dim or dim
         assert (
             hidden_dim % heads == 0
-        ), name_with_msg(f"")
-
+        ), name_with_msg(self, f"")
+        
+        max_seq_len = max_seq_len**0.5  # due to H and W
         assert (
             (0 < local_window_size) and (local_window_size <= max_seq_len)
-        ), name_with_msg(f"`local_window_size` should be in the interval (0, `max_seq_len`]: (0, {max_seq_len}]. But got: {local_window_size}.")
+        ), name_with_msg(self, f"`local_window_size` should be in the interval (0, `max_seq_len`]: (0, {max_seq_len}]. But got: {local_window_size}.")
 
         self.heads = heads
 
@@ -195,7 +197,7 @@ class AFTConv(nn.Module):
         self.w_norm = nn.BatchNorm2d(1, eps=epsilon)
         self.conv2d = AFTDepthWiseConv2DOperator()
 
-        self.query_act_fnc = get_act_fnc(query_act_fnc)
+        self.query_act_fnc = get_act_fnc(query_act_fnc)()
         self.attention_dropout = nn.Dropout(attention_dropout)
         self.out_dropout = nn.Dropout(ff_dropout)
         self.epsilon = epsilon
@@ -219,16 +221,16 @@ class AFTConv(nn.Module):
         k_list = torch.split(k, 1, dim=1)
         v_list = torch.split(v, 1, dim=1)
         w = self.w_norm(self.w)
-
+        
         outs = []
         for head_idx in range(self.heads):
             k_ = k_list[head_idx]
             v_ = rearrange(v_list[head_idx], "b 1 d h w -> b d h w")
             w_ = w[head_idx].exp() - 1
-            
             numenator = self.conv2d(k_*v_, w_) + global_connectivity[:, head_idx, ...]
             denominator = self.conv2d(k_, w_) + global_connectivity_norm[:, head_idx, ...]
             out = numenator / (denominator + self.epsilon)
+            print(k_.shape, v_.shape, numenator.shape, denominator.shape, self.conv2d(k_*v_, w_).shape, w_.shape)
 
             outs.append(out)
 
@@ -293,7 +295,7 @@ class AFTLayer(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         _, _, H, W = x.shape
-        x = rearrange(x, "b c h w -> b (h w) c", h=H, w=W)
+        x = rearrange(x, "b c h w -> b (h w) c")
 
         if self.use_conv:
             x = x + self.attn_path_drop(self.attn_block(self.attn_norm(x), H, W))
@@ -302,7 +304,7 @@ class AFTLayer(nn.Module):
 
         x = x + self.ff_path_drop(self.ff_block(self.ff_norm(x)))
 
-        x = rearrange(x, "b (h w) c -> b c h w")
+        x = rearrange(x, "b (h w) c -> b c h w", h=H, w=W)
 
         return x
 
