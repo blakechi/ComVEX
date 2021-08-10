@@ -38,7 +38,7 @@ class AFTGeneral(nn.Module):
         position_bias_dim: int = 128,
         hidden_dim: Optional[int] = None,
         local_window_size: Optional[int] = 0,  # make sure the assert raises when not be specified
-        query_act_fnc: str = "Sigmoid",
+        query_act_fnc_name: str = "Sigmoid",
         use_bias: bool = False,
         use_position_bias: bool = True,
         attention_dropout: float = 0.,
@@ -64,7 +64,7 @@ class AFTGeneral(nn.Module):
             self.u = nn.Parameter(torch.rand(max_seq_len, position_bias_dim), requires_grad=True)
             self.v = nn.Parameter(torch.rand(max_seq_len, position_bias_dim), requires_grad=True)
         
-        self.query_act_fnc = get_act_fnc(query_act_fnc)()
+        self.query_act_fnc = get_act_fnc(query_act_fnc_name)()
         self.attention_dropout = nn.Dropout(attention_dropout)
         self.out_dropout = nn.Dropout(ff_dropout)
 
@@ -136,7 +136,7 @@ class AFTGeneral(nn.Module):
 AFTFull = partial(AFTGeneral, local_window_size=None, use_position_bias=True)
 
 
-AFTSimple = partial(AFTGeneral, use_position_bias=False)
+AFTSimple = partial(AFTGeneral, local_window_size=None, use_position_bias=False)
 
 
 AFTLocal = partial(AFTGeneral, use_position_bias=True)
@@ -168,7 +168,7 @@ class AFTConv(nn.Module):
         local_window_size: int,
         max_seq_len: int,
         hidden_dim: Optional[int] = None,
-        query_act_fnc: str = "Sigmoid",
+        query_act_fnc_name: str = "Sigmoid",
         use_bias: bool = False,
         epsilon: float = 1e-8,
         attention_dropout: float = 0.,
@@ -197,7 +197,7 @@ class AFTConv(nn.Module):
         self.w_norm = nn.BatchNorm2d(1, eps=epsilon)
         self.conv2d = AFTDepthWiseConv2DOperator()
 
-        self.query_act_fnc = get_act_fnc(query_act_fnc)()
+        self.query_act_fnc = get_act_fnc(query_act_fnc_name)()
         self.attention_dropout = nn.Dropout(attention_dropout)
         self.out_dropout = nn.Dropout(ff_dropout)
         self.epsilon = epsilon
@@ -329,7 +329,7 @@ class AFTBackbone(ViTBase):
         hidden_dim: Optional[int] = None,
         aft_mode: Literal["full", "simple", "local", "conv", "general"] = "full",
         pool_mode: Literal["mean", "class"] = "mean",
-        query_act_fnc: str = "Sigmoid",
+        query_act_fnc_name: str = "Sigmoid",
         use_bias: bool = False,
         ff_expand_scale: int = 4,
         ff_dropout: float = 0.,
@@ -356,7 +356,7 @@ class AFTBackbone(ViTBase):
                 local_window_size=local_window_size,
                 max_seq_len=self.num_patches,
                 hidden_dim=hidden_dim,
-                query_act_fnc=query_act_fnc,
+                query_act_fnc_name=query_act_fnc_name,
                 use_bias=use_bias,
                 heads=heads,
                 epsilon=epsilon,
@@ -372,7 +372,7 @@ class AFTBackbone(ViTBase):
                 local_window_size=local_window_size,
                 max_seq_len=self.num_patches,
                 hidden_dim=hidden_dim,
-                query_act_fnc=query_act_fnc,
+                query_act_fnc_name=query_act_fnc_name,
                 use_bias=use_bias,
                 position_bias_dim=position_bias_dim,
                 use_position_bias=use_position_bias,

@@ -16,7 +16,7 @@ class AFTConfig(ConfigBase):
         hidden_dim: Optional[int] = None,
         aft_mode: Literal["full", "simple", "local", "conv", "general"] = "full",
         pool_mode: Literal["mean", "class"] = "mean",
-        query_act_fnc: str = "Sigmoid",
+        query_act_fnc_name: str = "Sigmoid",
         use_bias: bool = False,
         ff_expand_scale: int = 4,
         ff_dropout: float = 0.,
@@ -46,7 +46,7 @@ class AFTConfig(ConfigBase):
         self.hidden_dim=hidden_dim
         self.aft_mode=aft_mode
         self.pool_mode=pool_mode
-        self.query_act_fnc=query_act_fnc
+        self.query_act_fnc_name=query_act_fnc_name
         self.use_bias=use_bias
         self.ff_expand_scale=ff_expand_scale
         self.ff_dropout=ff_dropout
