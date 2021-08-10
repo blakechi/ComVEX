@@ -13,8 +13,10 @@ from einops import rearrange, repeat
 
 from comvex.vit import ViTBase
 from comvex.cait import ClassAttentionLayer
-from comvex.utils import MLP
-from comvex.utils.helpers.functions import get_act_fnc, name_with_msg
+from comvex.utils import MLP, ProjectionHead
+from comvex.utils.helpers.functions import get_act_fnc, name_with_msg, config_pop_argument
+
+from .config import AFTConfig
 
 
 class AFTGeneral(nn.Module):
@@ -322,7 +324,6 @@ class AFTBackbone(ViTBase):
         num_layers: int,
         dim: int,
         local_window_size: int,
-        max_seq_len: int,
         hidden_dim: Optional[int] = None,
         aft_mode: Literal["full", "simple", "local", "conv", "general"] = "full",
         pool_mode: Literal["mean", "class"] = "mean",
@@ -351,7 +352,7 @@ class AFTBackbone(ViTBase):
                 dim=dim,
                 mode=aft_mode,
                 local_window_size=local_window_size,
-                max_seq_len=max_seq_len,
+                max_seq_len=self.num_patches,
                 hidden_dim=hidden_dim,
                 query_act_fnc=query_act_fnc,
                 use_bias=use_bias,
@@ -367,7 +368,7 @@ class AFTBackbone(ViTBase):
                 dim=dim,
                 mode=aft_mode,
                 local_window_size=local_window_size,
-                max_seq_len=max_seq_len,
+                max_seq_len=self.num_patches,
                 hidden_dim=hidden_dim,
                 query_act_fnc=query_act_fnc,
                 use_bias=use_bias,
@@ -414,3 +415,23 @@ class AFTBackbone(ViTBase):
                 out = cls_layer(out, x)
 
         return out.view(b, -1)
+
+
+class AFTWithLinearClassifier(AFTBackbone):
+    def __init__(self, config: AFTConfig) -> None:
+        num_classes = config_pop_argument(config, "num_classes")
+        pred_act_fnc_name = config_pop_argument(config, "pred_act_fnc_name")
+        super().__init__(**config.__dict__)
+
+        self.proj_head = ProjectionHead(
+            dim=config.dim,
+            out_dim=num_classes,
+            act_fnc_name=pred_act_fnc_name
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b = x.shape[0]
+        
+        x = super().forward(x)
+
+        return self.proj_head(x)
