@@ -155,6 +155,7 @@ class PatchEmbeddingXd(XXXConvXdBase):
         patch_size: int,
         dimension: int = 2,
         to_flat: bool = True,
+        use_bias: bool = False,
     ) -> None:
         super().__init__(in_channel=image_channel, out_channel=embedding_dim, dimension=dimension)
 
@@ -162,7 +163,8 @@ class PatchEmbeddingXd(XXXConvXdBase):
             self.in_channel,
             self.out_channel,
             kernel_size=patch_size,
-            stride=patch_size
+            stride=patch_size,
+            bias=use_bias
         )
         self.norm = nn.LayerNorm(self.out_channel) if to_flat else get_norm_layer(f"BatchNorm{self.dimension}d")(self.out_channel)
 
@@ -184,3 +186,17 @@ class PatchEmbeddingXd(XXXConvXdBase):
     @torch.jit.ignore
     def no_weight_decay(self) -> List[str]:
         return ["LayerNorm.weight"] if self.to_flat else [f"BatchNorm{self.dimension}d.weight"]
+
+
+class ChannelFirstLayerNorm(nn.Module):
+    def __init__(self, *arg, **kwargs) -> None:
+        super().__init__()
+
+        self.norm = nn.LayerNorm(*arg, **kwargs)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.permute(0, 2, 3, 1)
+        x = self.norm(x)
+        x = x.permute(0, 3, 1, 2)
+
+        return x
