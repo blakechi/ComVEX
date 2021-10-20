@@ -27,10 +27,17 @@ from setuptools import setup, find_packages
 
 
 root = os.path.abspath(os.path.dirname(__file__))
+
+# version
+exec(open(os.path.join(root, 'comvex', 'version.py')).read())
+
+# description
 with open(os.path.join(root, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-exec(open(os.path.join(root, 'comvex', 'version.py')).read())
+# requirements
+with open(os.path.join(root, "requirements.txt"), "r") as file:
+    required_packages = [ln.strip() for ln in file.readlines()]
 
 setup(
     name='comvex',
@@ -57,5 +64,5 @@ setup(
     packages=find_packages(exclude=['examples', 'tests']),
     include_package_data=True,
     python_requires='>=3.6',
-    install_requires=['torch >= 1.8.1', 'einops >= 0.3.0', 'torchvision >= 0.8.2'],
+    install_requires=required_packages,
 )
