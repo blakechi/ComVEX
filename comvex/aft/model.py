@@ -1,6 +1,7 @@
 from comvex.utils.dropout import PathDropout
 from functools import partial
-from typing import Optional, Literal, Dict
+from typing import Optional, Dict
+from typing_extensions import Literal
 
 import torch
 from torch import nn, einsum
