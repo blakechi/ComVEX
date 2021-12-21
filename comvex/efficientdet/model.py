@@ -1,4 +1,3 @@
-from comvex.utils.helpers.functions import name_with_msg
 from functools import partial
 from collections import OrderedDict
 from itertools import accumulate
@@ -13,7 +12,7 @@ except:
     from torch.jit import Final
 
 from comvex.utils import EfficientNetBackboneConfig, EfficientNetBackbone, BiFPN, SeperableConvXd, PathDropout
-from comvex.utils.helpers import get_norm_layer, get_act_fnc, config_pop_argument
+from comvex.utils.helpers import get_norm_layer, get_act_fnc, config_pop_argument, name_with_msg
 from .config import EfficientDetObjectDetectionConfig
  
 

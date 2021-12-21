@@ -1,5 +1,3 @@
-from comvex.utils.helpers.functions import name_with_msg
-from collections import OrderedDict
 from typing import List, Tuple, Optional
 from typing_extensions import Literal
 
@@ -13,7 +11,7 @@ except:
 
 from .convolution import SeperableConvXd, XXXConvXdBase
 from .config_base import ConfigBase
-from .helpers import get_conv_layer
+from .helpers import get_conv_layer, name_with_msg
 
 
 @torch.jit.script
