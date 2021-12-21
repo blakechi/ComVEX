@@ -1,5 +1,5 @@
-from typing import Tuple, List, Literal, Optional
-
+from typing import Tuple, List, Optional
+from typing_extensions import Literal
 from comvex.utils import ConfigBase, EfficientNetBackboneConfig, BiFPNConfig
 
 

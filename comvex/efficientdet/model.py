@@ -2,7 +2,8 @@ from comvex.utils.helpers.functions import name_with_msg
 from functools import partial
 from collections import OrderedDict
 from itertools import accumulate
-from typing import Literal, List, Tuple, Optional
+from typing import List, Tuple, Optional
+from typing_extensions import Literal
 
 import torch
 from torch import nn

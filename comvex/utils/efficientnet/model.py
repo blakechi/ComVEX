@@ -1,4 +1,5 @@
-from typing import Optional, Union, List, Dict, Literal
+from typing import Optional, Union, List, Dict
+from typing_extensions import Literal
 from collections import OrderedDict
 import math
 
