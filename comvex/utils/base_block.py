@@ -1,5 +1,6 @@
 from functools import partial
-from typing import Optional, Literal, List
+from typing import Optional, List
+from typing_extensions import Literal
 
 import torch
 from torch import nn

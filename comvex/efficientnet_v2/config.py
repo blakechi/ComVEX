@@ -1,4 +1,5 @@
-from typing import Optional, List, Literal
+from typing import Optional, List
+from typing_extensions import Literal
 
 from comvex.utils import ConfigBase
 
